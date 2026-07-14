@@ -1,0 +1,57 @@
+﻿# MRI pipeline configuration
+#
+# The user provides the actual input and output roots from the CLI:
+#
+#   python run_pipeline.py run --input "..." --output "..." --steps ...
+#
+# All folders below are relative to the selected --output folder.
+
+run:
+  default_steps:
+    - split-sequences
+    - preprocess-flair
+    - split-normalizations
+
+  folders:
+    split_sequences: "By_Sequence"
+    preprocessed_flair: "Preprocessed_FLAIR"
+    organized_pre: "Organized_Pre"
+    organized_post: "Organized_Post"
+    transforms: "Transforms"
+
+  timepoints:
+    pre: "Pre"
+    post: "Post"
+
+  sequences:
+    - FLAIR
+    - dDTI
+    - faDTI
+    - isoDTI
+
+  normalizations:
+    - z-score
+    - min-max
+    - fcm
+    - whitestripe
+
+  transforms:
+    save: true
+    overwrite: false
+    pre_folder: "Pre"
+    post_folder: "Post"
+
+  preprocess_flair:
+    atlas_path: "/path/to/atlas/GG-853-FLAIR-0.7mm.nii"
+    sequence: "FLAIR"
+    steps:
+      - n4
+      - registration
+      - skull-strip
+      - normalization
+    normalization_methods:
+      - z-score
+      - min-max
+      - fcm
+      - whitestripe
+

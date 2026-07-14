@@ -1,0 +1,24 @@
+# Core configuration and image processing
+PyYAML>=6.0
+numpy>=1.24
+scipy>=1.10
+nibabel>=5.0
+SimpleITK>=2.3
+tqdm>=4.66
+
+# Used only to choose CUDA/MPS/CPU for HD-BET.
+torch>=2.0
+
+# Skull stripping. The pipeline calls the external "hd-bet" command.
+# If pip installation fails, install HD-BET from its official repository
+# and confirm that "hd-bet --help" works in the active environment.
+HD-BET
+
+# Radiomics export and tabular outputs.
+pyradiomics>=3.0
+pandas>=2.0
+openpyxl>=3.1
+
+# External tools not installed by pip:
+# - Docker, needed for SynthSeg mask creation.
+# - FreeSurfer SynthSeg Docker image: freesurfer/freesurfer:8.2.0.
