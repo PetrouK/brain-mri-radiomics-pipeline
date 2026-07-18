@@ -11,6 +11,11 @@ from mri_pipeline.preprocessing.flair_pipeline import (
     run_flair_pipeline,
 )
 
+from mri_pipeline.preprocessing.diff_images import (
+    create_flair_difference_images,
+    create_registered_difference_pair,
+)
+
 try:
     from tqdm.auto import tqdm
 except ImportError:
@@ -21,6 +26,7 @@ except ImportError:
 RUN_STEPS = [
     "split-sequences",
     "preprocess-flair",
+    "make-diff-images",
     "split-normalizations",
 ]
 
@@ -73,6 +79,12 @@ def build_parser():
     )
 
     parser.add_argument(
+        "--diff-register-missing",
+        action="store_true",
+        help="Register missing Pre/Post pairs before creating difference images.",
+    )
+
+    parser.add_argument(
         "--config",
         default="config.yaml",
         help="Path to config YAML file",
@@ -89,6 +101,16 @@ def build_parser():
         choices=["one-file", "folder"],
         default=None,
         help="Preprocessing mode for preprocess-flair.",
+    )
+
+    parser.add_argument(
+        "--reference",
+        help="Reference image for standalone difference image creation.",
+    )
+
+    parser.add_argument(
+        "--source",
+        help="Source image for standalone difference image creation.",
     )
 
     return parser
@@ -151,18 +173,28 @@ def run_flair_file_preprocessing(
     )
 
 
-def run_pipeline_steps(config, input_root, output_root, steps, copy_files=True, preprocess_steps=None):
+def run_pipeline_steps(config, 
+                       input_root, 
+                       output_root, 
+                       steps, 
+                       copy_files=True, 
+                       preprocess_steps=None,
+                       diff_register_missing=False,
+                       ):
+    
     run_config = config["run"]
     folders_config = run_config["folders"]
     timepoints_config = run_config["timepoints"]
     transforms_config = run_config["transforms"]
     flair_config = run_config["preprocess_flair"]
+    diff_config = run_config.get("difference_images", {})
 
     input_root = Path(input_root)
     output_root = Path(output_root)
 
     output_seq = output_root / folders_config["split_sequences"]
     output_preprocessed = output_root / folders_config["preprocessed_flair"]
+    output_diff = output_root / folders_config["difference_images"]
     output_organized_pre = output_root / folders_config["organized_pre"]
     output_organized_post = output_root / folders_config["organized_post"]
     output_transforms = output_root / folders_config["transforms"]
@@ -224,6 +256,27 @@ def run_pipeline_steps(config, input_root, output_root, steps, copy_files=True, 
             if not created_files:
                 raise ValueError(f"No normalized files found in {normalization_source}. Check that filenames contain one of the configured normalizations: {run_config['normalizations']}")
             summary[step] = created_files
+
+        if step == "make-diff-images":
+            diff_config = run_config.get("difference_images", {})
+
+            if "preprocess-flair" in summary:
+                difference_source = output_preprocessed
+            else:
+                difference_source = input_root
+
+            created_files = create_flair_difference_images(
+                preprocessed_root=difference_source,
+                output_root=output_root / folders_config["difference_images"],
+                pre_timepoint=timepoints_config.get("pre", "Pre"),
+                post_timepoint=timepoints_config.get("post", "Post"),
+                histogram_levels=diff_config.get("histogram_levels", 512),
+                match_points=diff_config.get("match_points", 10),
+                threshold_at_mean=diff_config.get("threshold_at_mean", True),
+                register_missing=diff_register_missing,
+            )
+
+            summary[step] = created_files
             
     return summary
 
@@ -262,6 +315,7 @@ def main():
             steps=steps,
             copy_files=copy_files,
             preprocess_steps=args.preprocess_steps,
+            diff_register_missing=args.diff_register_missing,
         )
         print("Run complete.")
         print(summarize_run(summary))
@@ -338,18 +392,27 @@ def main():
         return
 
     if args.command == "make-diff-images":
-        from mri_pipeline.preprocessing.diff_images import create_flair_difference_images
+        if not args.reference:
+            parser.error("make-diff-images requires --reference")
+        if not args.source:
+            parser.error("make-diff-images requires --source")
+        if not args.output:
+            parser.error("make-diff-images requires --output")
 
-        diff_config = config.get("diff_images", {})
+        diff_config = config["run"].get("difference_images", {})
 
-        created_files = create_flair_difference_images(
-            pre_root=diff_config.get("pre_root", config["pre_flair_root"]),
-            post_root=diff_config.get("post_root", config["post_flair_root"]),
-            output_root=diff_config["output_root"],
-            brain_pattern=diff_config.get("brain_pattern", "*_brain.nii*"),
+        result = create_registered_difference_pair(
+            reference_path=args.reference,
+            source_path=args.source,
+            output_root=args.output,
+            histogram_levels=diff_config.get("histogram_levels", 512),
+            match_points=diff_config.get("match_points", 10),
+            threshold_at_mean=diff_config.get("threshold_at_mean", True),
+            register_if_needed=True,
         )
 
-        print(f"Created {len(created_files)} difference images.")
+        print("Difference image complete.")
+        print(result)
         return
 
     if args.command == "make-synthseg-masks":

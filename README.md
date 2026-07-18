@@ -1,56 +1,58 @@
-﻿# MRI Pipeline
+# MRI Pipeline
 
-This project organizes and runs basic MRI preprocessing workflows, with the main focus on FLAIR images. The user provides an input path and an output path from the command line. The `config.yaml` file defines output folder names, preprocessing steps, timepoint names, sequences, normalization methods, and transform behavior.
+MRI Pipeline is a command-line project for organizing and preprocessing brain MRI data, with the current focus on FLAIR images. It supports sequence organization, FLAIR preprocessing, histogram-based difference images between Pre/Post scans, transform reuse, and organization of normalized outputs.
 
-## Quick Start
-
-Open a terminal inside the project folder:
-
-```bash
-cd /path/to/MRI_pipeline
-```
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Show available options:
-
-```bash
-python run_pipeline.py --help
-```
-
-Run the default workflow:
+The recommended entry point is:
 
 ```bash
 python run_pipeline.py run --input "/path/to/input" --output "/path/to/output"
 ```
 
+The user provides the input and output paths from the command line. The default folder names, preprocessing settings, timepoint names, sequence names, normalization methods, and difference-image settings are stored in `config.yaml`.
+
+## Installation
+
+Clone or download the repository, then open a terminal in the project folder:
+
+```bash
+cd /path/to/MRI_pipeline
+```
+
+Install the Python requirements:
+
+```bash
+pip install -r requirements.txt
+```
+
+Check the CLI:
+
+```bash
+python run_pipeline.py --help
+```
+
+For skull stripping, HD-BET must also be available from the terminal:
+
+```bash
+hd-bet --help
+```
+
+## Main CLI Pattern
+
+Most workflows use:
+
+```bash
+python run_pipeline.py run --input "/path/to/input" --output "/path/to/output" --steps STEP_1 STEP_2
+```
+
 If `--steps` is not provided, the pipeline uses `run.default_steps` from `config.yaml`.
 
-## Main Concept
+Example:
 
-The user provides:
-
-```text
---input   the input folder or input file to process
---output  the root folder where all results will be written
+```bash
+python run_pipeline.py run --input "/data/raw_mri" --output "/data/processed_mri"
 ```
 
-All outputs are created under `--output`:
-
-```text
-OUTPUT/
-  By_Sequence/
-  Preprocessed_FLAIR/
-  Organized_Pre/
-  Organized_Post/
-  Transforms/
-```
-
-These folder names are configured in `config.yaml`.
+All generated folders are created inside the selected `--output` folder.
 
 ## Project Structure
 
@@ -60,7 +62,6 @@ MRI_pipeline/
   run_pipeline.py
   requirements.txt
   README.md
-  README_EN.md
   mri_pipeline/
     utils/
     organize/
@@ -69,9 +70,9 @@ MRI_pipeline/
     radiomics/
 ```
 
-## config.yaml
+## Configuration
 
-The current configuration is centered under the `run` section.
+The current `config.yaml` is centered around the `run` section:
 
 ```yaml
 run:
@@ -83,131 +84,186 @@ run:
   folders:
     split_sequences: "By_Sequence"
     preprocessed_flair: "Preprocessed_FLAIR"
+    difference_images: "Difference_Images"
     organized_pre: "Organized_Pre"
     organized_post: "Organized_Post"
     transforms: "Transforms"
+
+  timepoints:
+    pre: "Pre"
+    post: "Post"
 ```
 
-The `folders` values are relative to the selected `--output`.
+Folder names are relative to `--output`.
 
 Example:
 
 ```bash
-python run_pipeline.py run --input "/path/to/new_data" --output "/path/to/study_output"
+python run_pipeline.py run --input "/data/raw_mri" --output "/data/processed_mri"
 ```
 
-writes to:
+creates outputs such as:
 
 ```text
-/path/to/study_output/By_Sequence/
-/path/to/study_output/Preprocessed_FLAIR/
-/path/to/study_output/Organized_Pre/
-/path/to/study_output/Organized_Post/
-/path/to/study_output/Transforms/
+/data/processed_mri/
+  By_Sequence/
+  Preprocessed_FLAIR/
+  Difference_Images/
+  Organized_Pre/
+  Organized_Post/
+  Transforms/
+```
+
+Before running registration, set the atlas/reference image path in `config.yaml`:
+
+```yaml
+run:
+  preprocess_flair:
+    atlas_path: "/path/to/reference_or_atlas_FLAIR.nii.gz"
 ```
 
 ## Supported Input Layouts
 
-### Multiple patients with Pre/Post
+### Multiple Patients
 
 ```text
 Input/
   Patient_001/
     Pre/
-      Patient_001_FLAIR.nii
+      Patient_001_FLAIR.nii.gz
     Post/
-      Patient_001_FLAIR.nii
+      Patient_001_FLAIR.nii.gz
   Patient_002/
     Pre/
       Patient_002_FLAIR.nii.gz
+    Post/
+      Patient_002_FLAIR.nii.gz
 ```
 
-### A single patient with Pre/Post
+Run:
 
-You can provide the patient folder directly:
+```bash
+python run_pipeline.py run --input "/data/Input" --output "/data/Output"
+```
+
+### Single Patient Folder
+
+You can pass one patient folder directly:
 
 ```text
 Patient_001/
   Pre/
-    Patient_001_FLAIR.nii
+    Patient_001_FLAIR.nii.gz
   Post/
-    Patient_001_FLAIR.nii
+    Patient_001_FLAIR.nii.gz
 ```
+
+Run:
 
 ```bash
-python run_pipeline.py run --input "/path/to/new_data/Patient_001" --output "/path/to/output"
+python run_pipeline.py run --input "/data/Patient_001" --output "/data/Output"
 ```
 
-### Pre-only patient without Pre/Post folders
+### Pre-Only Folder
 
-If `Pre` and `Post` folders do not exist, the folder is treated as `Pre`.
+If no `Pre` or `Post` folders are found, the folder is treated as a Pre-only case:
 
 ```text
 Patient_001/
-  Patient_001_FLAIR.nii
+  Patient_001_FLAIR.nii.gz
 ```
 
-### Single FLAIR file
+### Single FLAIR File
 
-You can provide a single NIfTI file directly:
+You can preprocess a single NIfTI file:
 
 ```bash
-python run_pipeline.py run --input "/path/to/new_data/Patient_001/Pre/Patient_001_FLAIR.nii" --output "/path/to/output" --steps preprocess-flair
+python run_pipeline.py run \
+  --input "/data/Patient_001/Pre/Patient_001_FLAIR.nii.gz" \
+  --output "/data/Output" \
+  --steps preprocess-flair
 ```
 
-If the file is inside a `Pre` or `Post` folder, the timepoint is inferred from the parent folder. Otherwise, it is treated as `Pre`.
+If the file is inside a `Pre` or `Post` folder, the timepoint is inferred from the parent folder. Otherwise, the file is treated as `Pre`.
 
-## Run Steps
+## Pipeline Steps
 
-The `run` command supports three pipeline steps:
+The `run` command supports:
 
 ```text
 split-sequences
 preprocess-flair
+make-diff-images
 split-normalizations
 ```
 
-### split-sequences
+You can run one step:
 
-Organizes raw files by timepoint and sequence.
+```bash
+python run_pipeline.py run --input "/data/Input" --output "/data/Output" --steps preprocess-flair
+```
 
-Input:
+or several steps in order:
+
+```bash
+python run_pipeline.py run \
+  --input "/data/Input" \
+  --output "/data/Output" \
+  --steps split-sequences preprocess-flair make-diff-images split-normalizations
+```
+
+## Step: split-sequences
+
+This step organizes files by timepoint and sequence.
+
+Example input:
 
 ```text
 Input/
   Patient_001/
     Pre/
-      scan_FLAIR.nii
-      scan_dDTI.nii
+      scan_FLAIR.nii.gz
+      scan_dDTI.nii.gz
     Post/
-      scan_FLAIR.nii
+      scan_FLAIR.nii.gz
 ```
 
-Output:
+Command:
+
+```bash
+python run_pipeline.py run --input "/data/Input" --output "/data/Output" --steps split-sequences
+```
+
+Example output:
 
 ```text
-OUTPUT/By_Sequence/
-  Pre_FLAIR/
-    Patient_001/
-  Pre_dDTI/
-    Patient_001/
-  Post_FLAIR/
-    Patient_001/
+Output/
+  By_Sequence/
+    Pre_FLAIR/
+      Patient_001/
+        scan_FLAIR.nii.gz
+    Pre_dDTI/
+      Patient_001/
+        scan_dDTI.nii.gz
+    Post_FLAIR/
+      Patient_001/
+        scan_FLAIR.nii.gz
 ```
 
-Sequences are configured in `config.yaml`:
+Sequence names are configured in `config.yaml`:
 
 ```yaml
-sequences:
-  - FLAIR
-  - dDTI
-  - faDTI
-  - isoDTI
+run:
+  sequences:
+    - FLAIR
+    - dDTI
+    - faDTI
+    - isoDTI
 ```
 
-### preprocess-flair
+## Step: preprocess-flair
 
-Runs preprocessing only for FLAIR images.
+This step preprocesses FLAIR images.
 
 Available internal preprocessing steps:
 
@@ -218,308 +274,489 @@ skull-strip
 normalization
 ```
 
-The default order is configured in `config.yaml`:
+Default order in `config.yaml`:
 
 ```yaml
-preprocess_flair:
-  steps:
-    - n4
-    - registration
-    - skull-strip
-    - normalization
+run:
+  preprocess_flair:
+    steps:
+      - n4
+      - registration
+      - skull-strip
+      - normalization
 ```
 
-Step order matters. Each step receives the output of the previous step, except `normalization`, which creates normalized output variants but does not replace the main processing image. Therefore, when `normalization` is used together with other steps, it must be the final preprocessing step.
+Step order matters. Each step receives the output of the previous step. `normalization` creates normalized variants and should be used as the final preprocessing step when combined with other preprocessing steps.
 
-Output:
+Run only the configured preprocessing:
+
+```bash
+python run_pipeline.py run --input "/data/Input" --output "/data/Output" --steps preprocess-flair
+```
+
+Override preprocessing steps from the command line:
+
+```bash
+python run_pipeline.py run \
+  --input "/data/Input" \
+  --output "/data/Output" \
+  --steps preprocess-flair \
+  --preprocess-steps n4 registration skull-strip normalization
+```
+
+Only registration for a single FLAIR image:
+
+```bash
+python run_pipeline.py run \
+  --input "/data/Patient_001/Pre/Patient_001_FLAIR.nii.gz" \
+  --output "/data/Output" \
+  --steps preprocess-flair \
+  --preprocess-steps registration
+```
+
+Registration and skull stripping for a single FLAIR image:
+
+```bash
+python run_pipeline.py run \
+  --input "/data/Patient_001/Pre/Patient_001_FLAIR.nii.gz" \
+  --output "/data/Output" \
+  --steps preprocess-flair \
+  --preprocess-steps registration skull-strip
+```
+
+Example output:
 
 ```text
-OUTPUT/Preprocessed_FLAIR/
-  Patient_001/
-    Pre/
-      scan_corr.nii
-      scan_corr_R.nii
-      scan_corr_R_brain.nii.gz
-      scan_corr_R_brain_z-score.nii.gz
-      scan_corr_R_brain_min-max.nii.gz
-      scan_corr_R_brain_fcm.nii.gz
-      scan_corr_R_brain_whitestripe.nii.gz
-    Post/
-      ...
-```
-
-### split-normalizations
-
-Organizes final brain images and normalized images into separate Pre and Post roots.
-
-Output:
-
-```text
-OUTPUT/Organized_Pre/
-  Pre/
-    Patient_001/
-      scan_corr_R_brain.nii.gz
-  z-score/
-    Patient_001/
-      scan_corr_R_brain_z-score.nii.gz
-  min-max/
-  fcm/
-  whitestripe/
-
-OUTPUT/Organized_Post/
-  Post/
-    Patient_001/
-      scan_corr_R_brain.nii.gz
-  z-score/
-  min-max/
-  fcm/
-  whitestripe/
-```
-
-If `split-normalizations` runs after `preprocess-flair` in the same command, it uses:
-
-```text
-OUTPUT/Preprocessed_FLAIR/
-```
-
-as its source. If it runs by itself, it uses `--input` as its source.
-
-## Command Examples
-
-### Full workflow
-
-```bash
-python run_pipeline.py run --input "/path/to/new_data" --output "/path/to/output"
-```
-
-This is equivalent to:
-
-```bash
-python run_pipeline.py run --input "/path/to/new_data" --output "/path/to/output" --steps split-sequences preprocess-flair split-normalizations
-```
-
-### Only organize by sequence
-
-```bash
-python run_pipeline.py run --input "/path/to/new_data" --output "/path/to/output" --steps split-sequences
-```
-
-### Only FLAIR preprocessing
-
-```bash
-python run_pipeline.py run --input "/path/to/new_data" --output "/path/to/output" --steps preprocess-flair
-```
-
-### Only registration for one FLAIR file
-
-```bash
-python run_pipeline.py run --input "/path/to/new_data/Patient_001/Pre/Patient_001_FLAIR.nii" --output "/path/to/output" --steps preprocess-flair --preprocess-steps registration
-```
-
-Output:
-
-```text
-/path/to/output/
+Output/
   Preprocessed_FLAIR/
     Patient_001/
       Pre/
         Patient_001_FLAIR_R.nii
+        Patient_001_FLAIR_R_brain.nii.gz
+        Patient_001_FLAIR_R_brain_z-score.nii.gz
+        Patient_001_FLAIR_R_brain_min-max.nii.gz
+        Patient_001_FLAIR_R_brain_fcm.nii.gz
+        Patient_001_FLAIR_R_brain_whitestripe.nii.gz
+```
+
+## Registration Transforms
+
+Transforms are saved under the selected `--output` folder:
+
+```text
+Output/
   Transforms/
     Pre/
       Patient_001/
         Patient_001.tfm
-```
-
-### Registration and skull stripping for one file
-
-```bash
-python run_pipeline.py run --input "/path/to/new_data/Patient_001/Pre/Patient_001_FLAIR.nii" --output "/path/to/output" --steps preprocess-flair --preprocess-steps registration skull-strip
-```
-
-### N4, registration, skull stripping, normalization
-
-```bash
-python run_pipeline.py run --input "/path/to/new_data" --output "/path/to/output" --steps preprocess-flair --preprocess-steps n4 registration skull-strip normalization
-```
-
-### Organize already preprocessed / normalized files
-
-If you already have:
-
-```text
-Ready/
-  Patient_001/
-    Pre/
-      scan_corr_R_brain.nii.gz
-      scan_corr_R_brain_z-score.nii.gz
     Post/
-      scan_corr_R_brain.nii.gz
-      scan_corr_R_brain_min-max.nii.gz
+      Patient_001/
+        Patient_001.tfm
 ```
 
-run:
-
-```bash
-python run_pipeline.py run --input "/path/to/ready_data" --output "/path/to/output" --steps split-normalizations
-```
-
-## Transforms and Registration
-
-Transforms are output-relative:
-
-```text
-OUTPUT/Transforms/
-  Pre/
-    Patient_ID/
-      Patient_ID.tfm
-  Post/
-    Patient_ID/
-      Patient_ID.tfm
-```
-
-In `config.yaml`:
+The behavior is controlled by:
 
 ```yaml
-transforms:
-  save: true
-  overwrite: false
+run:
+  transforms:
+    save: true
+    overwrite: false
+    pre_folder: "Pre"
+    post_folder: "Post"
 ```
 
 Behavior:
 
 ```text
 save: true
-  if a new transform is estimated, it is saved.
+  New estimated transforms are saved.
 
 overwrite: false
-  if a .tfm already exists for the patient, it is reused.
-  if no .tfm exists, registration is estimated.
+  If a patient transform already exists, it is reused.
+  If no transform exists, a new one is estimated.
 
 overwrite: true
-  any existing .tfm is ignored and a new transform is estimated.
+  Existing transforms are ignored and new transforms are estimated.
 ```
 
-## Normalization Methods
+## Step: make-diff-images
 
-Supported methods:
+This step creates histogram-matched absolute difference images between Post and Pre FLAIR images.
+
+The difference image logic is:
 
 ```text
-z-score
-min-max
-fcm
-whitestripe
+1. Use Pre as the reference image.
+2. Use Post as the source image.
+3. If needed, register source to reference.
+4. Histogram-match source to reference.
+5. Save the absolute difference image.
 ```
 
-`split-normalizations` detects normalized files from their filenames. Examples:
+The histogram settings come from `config.yaml`:
+
+```yaml
+run:
+  difference_images:
+    source_timepoint: "Post"
+    reference_timepoint: "Pre"
+    histogram_levels: 256
+    match_points: 10
+    threshold_at_mean: true
+```
+
+### Difference Images Inside the Pipeline
+
+If `make-diff-images` runs after `preprocess-flair` in the same command, it uses:
 
 ```text
-scan_corr_R_brain_z-score.nii.gz
-scan_corr_R_brain_min-max.nii.gz
-scan_corr_R_brain_fcm.nii.gz
-scan_corr_R_brain_whitestripe.nii.gz
+Output/Preprocessed_FLAIR/
 ```
 
-The non-normalized final image is placed under `Pre/` or `Post/` when the filename ends with:
+as the source folder.
+
+Example:
+
+```bash
+python run_pipeline.py run \
+  --input "/data/Input" \
+  --output "/data/Output" \
+  --steps preprocess-flair make-diff-images \
+  --preprocess-steps registration skull-strip
+```
+
+If `make-diff-images` runs by itself through `run`, it uses `--input` as the source folder.
+
+Example with an already preprocessed folder:
+
+```bash
+python run_pipeline.py run \
+  --input "/data/Already_Preprocessed_FLAIR" \
+  --output "/data/Output" \
+  --steps make-diff-images
+```
+
+Expected folder layout:
+
+```text
+Already_Preprocessed_FLAIR/
+  Patient_001/
+    Pre/
+      Patient_001_FLAIR_R_brain.nii.gz
+    Post/
+      Patient_001_FLAIR_R_brain.nii.gz
+```
+
+The pipeline first looks for skull-stripped registered images:
+
+```text
+*_R_brain.nii*
+```
+
+If those do not exist, it looks for registered images:
+
+```text
+*_R.nii*
+```
+
+By default, pipeline folder mode does not register missing pairs automatically. If you want it to register missing pairs before creating difference images, add:
+
+```bash
+--diff-register-missing
+```
+
+Example:
+
+```bash
+python run_pipeline.py run \
+  --input "/data/Already_Preprocessed_FLAIR" \
+  --output "/data/Output" \
+  --steps make-diff-images \
+  --diff-register-missing
+```
+
+Difference image output:
+
+```text
+Output/
+  Difference_Images/
+    Patient_001/
+      Pair_YYYYMMDD_HHMMSS/
+        reference.nii.gz
+        source_registered.nii.gz
+        difference.nii.gz
+        source_to_reference.tfm
+```
+
+If registration was not needed, `source_to_reference.tfm` may not be created.
+
+### Standalone Difference Image From Two Files
+
+You can create a difference image directly from two NIfTI files without running the full pipeline:
+
+```bash
+python run_pipeline.py make-diff-images \
+  --reference "/data/Patient_001/Pre/Patient_001_Pre_FLAIR.nii.gz" \
+  --source "/data/Patient_001/Post/Patient_001_Post_FLAIR.nii.gz" \
+  --output "/data/Difference_Output"
+```
+
+Standalone mode checks whether the two images have the same geometry. If they do not, the source image is registered to the reference image automatically.
+
+Output:
+
+```text
+Difference_Output/
+  Pair_YYYYMMDD_HHMMSS/
+    reference.nii.gz
+    source_registered.nii.gz
+    difference.nii.gz
+    source_to_reference.tfm
+```
+
+## Step: split-normalizations
+
+This step organizes final brain images and normalized images into separate Pre and Post output roots.
+
+If it runs after `preprocess-flair` in the same command, it uses:
+
+```text
+Output/Preprocessed_FLAIR/
+```
+
+as its source. If it runs by itself, it uses `--input`.
+
+Command:
+
+```bash
+python run_pipeline.py run \
+  --input "/data/Already_Preprocessed_FLAIR" \
+  --output "/data/Output" \
+  --steps split-normalizations
+```
+
+Example input:
+
+```text
+Already_Preprocessed_FLAIR/
+  Patient_001/
+    Pre/
+      scan_R_brain.nii.gz
+      scan_R_brain_z-score.nii.gz
+      scan_R_brain_min-max.nii.gz
+    Post/
+      scan_R_brain.nii.gz
+      scan_R_brain_fcm.nii.gz
+```
+
+Example output:
+
+```text
+Output/
+  Organized_Pre/
+    Pre/
+      Patient_001/
+        scan_R_brain.nii.gz
+    z-score/
+      Patient_001/
+        scan_R_brain_z-score.nii.gz
+    min-max/
+      Patient_001/
+        scan_R_brain_min-max.nii.gz
+
+  Organized_Post/
+    Post/
+      Patient_001/
+        scan_R_brain.nii.gz
+    fcm/
+      Patient_001/
+        scan_R_brain_fcm.nii.gz
+```
+
+Configured normalization names:
+
+```yaml
+run:
+  normalizations:
+    - z-score
+    - min-max
+    - fcm
+    - whitestripe
+```
+
+The non-normalized final image is detected when the filename ends with:
 
 ```text
 _brain.nii
 _brain.nii.gz
 ```
 
-## Copy or Move
+## Common Workflows
 
-By default, organization steps copy files.
-
-To move instead:
+### Full FLAIR Workflow
 
 ```bash
-python run_pipeline.py run --input "/path/to/new_data" --output "/path/to/output" --steps split-sequences --move
+python run_pipeline.py run \
+  --input "/data/Input" \
+  --output "/data/Output" \
+  --steps split-sequences preprocess-flair make-diff-images split-normalizations \
+  --preprocess-steps n4 registration skull-strip normalization
 ```
 
-Warning: `--move` moves files in organization steps. Use it only when you are sure.
+### Add a New Patient to Existing Output Folders
 
-## Progress and Terminal Output
+Use the same output root as before:
 
-The pipeline uses `tqdm` progress bars for:
+```bash
+python run_pipeline.py run \
+  --input "/data/NewPatient_001" \
+  --output "/data/Output" \
+  --steps preprocess-flair make-diff-images split-normalizations
+```
+
+This writes the new patient into the same output structure:
+
+```text
+Output/
+  Preprocessed_FLAIR/
+  Difference_Images/
+  Organized_Pre/
+  Organized_Post/
+  Transforms/
+```
+
+### Only Organize New Files by Sequence
+
+```bash
+python run_pipeline.py run \
+  --input "/data/NewRawFiles" \
+  --output "/data/Output" \
+  --steps split-sequences
+```
+
+### Only Organize Already Normalized Files
+
+```bash
+python run_pipeline.py run \
+  --input "/data/Already_Preprocessed_FLAIR" \
+  --output "/data/Output" \
+  --steps split-normalizations
+```
+
+## Copy vs Move
+
+Organization steps copy files by default.
+
+To move files instead of copying them:
+
+```bash
+python run_pipeline.py run \
+  --input "/data/Input" \
+  --output "/data/Output" \
+  --steps split-sequences \
+  --move
+```
+
+Use `--move` carefully because it modifies the input location.
+
+## Progress Output
+
+The pipeline uses `tqdm` progress bars for long-running operations such as:
 
 ```text
 run steps
-patients
+patient loops
 preprocessing steps
 normalization methods
 ```
 
-HD-BET/nnU-Net also prints its own messages, including citation text and prediction progress. These messages come from the external HD-BET tool.
-
-## Dependencies
-
-Main Python packages:
-
-```text
-PyYAML
-numpy
-scipy
-nibabel
-SimpleITK
-torch
-HD-BET
-pyradiomics
-pandas
-openpyxl
-tqdm
-```
-
-For skull stripping, this command must work:
-
-```bash
-hd-bet --help
-```
-
-Docker is required for SynthSeg-related commands if those workflows are used separately.
+HD-BET and nnU-Net may also print their own progress messages and citation text during skull stripping. Those messages come from external tools.
 
 ## Troubleshooting
 
-### Nothing was created
+### No Files Were Created
 
-Check that `--input` is correct and contains `.nii` or `.nii.gz` files. If you provide a single file, it must be a NIfTI file.
+Check that:
 
-### Registration reuses an old transform
+```text
+1. --input exists.
+2. The input contains .nii or .nii.gz files.
+3. Filenames contain the configured sequence or normalization names.
+4. The expected Pre/Post folder names match config.yaml.
+```
+
+### Registration Uses an Old Transform
 
 If this exists:
 
 ```text
-OUTPUT/Transforms/Pre/Patient_ID/Patient_ID.tfm
+Output/Transforms/Pre/Patient_001/Patient_001.tfm
 ```
 
-and the config has:
+and:
 
 ```yaml
 overwrite: false
 ```
 
-the pipeline will reuse it. To force new registration, set:
+the transform is reused. Set:
 
 ```yaml
 overwrite: true
 ```
 
-### HD-BET prints many warnings
+to force a new registration transform.
 
-Warnings about `nnUNet_raw`, `nnUNet_preprocessed`, and `nnUNet_results` come from HD-BET/nnU-Net. If prediction finishes and you see `done with ...`, skull stripping completed.
+### make-diff-images Skips a Patient
 
-### Do not write directly to Desktop
+Folder mode expects each patient to contain both timepoints:
 
-Prefer:
-
-```bash
---output "/path/to/output"
+```text
+Patient_001/
+  Pre/
+  Post/
 ```
 
-instead of:
+and registered images such as:
 
-```bash
---output "/path/to"
+```text
+*_R_brain.nii*
 ```
 
-so the Desktop does not fill up with pipeline folders.
+or:
 
+```text
+*_R.nii*
+```
+
+If registered images are missing and you want the diff step to register them automatically, add:
+
+```bash
+--diff-register-missing
+```
+
+### HD-BET Output Is Very Verbose
+
+HD-BET prints citation information, nnU-Net environment warnings, prediction progress, and export messages. This is expected when skull stripping is running.
+
+### Recommended Output Path
+
+Use a dedicated output folder:
+
+```bash
+python run_pipeline.py run --input "/data/Input" --output "/data/Output"
+```
+
+Avoid writing directly to a broad location such as a desktop or home folder, because the pipeline creates several subfolders.
+
+## Notes for Future Development
+
+Planned project areas include:
+
+```text
+lesion segmentation management
+radiomics feature extraction
+brain MRI radiomics tables
+```
+
+The `lesions/` and `radiomics/` modules are present so these workflows can be added cleanly later.

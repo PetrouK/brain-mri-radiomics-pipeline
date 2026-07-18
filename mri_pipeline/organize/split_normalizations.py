@@ -35,7 +35,7 @@ def detect_timepoint(relative_path, pre_name="Pre", post_name="Post", default="P
 def is_final_brain_image(path):
     name = Path(path).name.lower()
 
-    return "_brain" in name and "_bet" not in name
+    return name.endswith(("_brain.nii", "_brain.nii.gz"))
 
 
 def choose_target_root(timepoint, target_root, pre_target_root=None, post_target_root=None):

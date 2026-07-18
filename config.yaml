@@ -15,6 +15,7 @@ run:
   folders:
     split_sequences: "By_Sequence"
     preprocessed_flair: "Preprocessed_FLAIR"
+    difference_images: "Difference_Images"
     organized_pre: "Organized_Pre"
     organized_post: "Organized_Post"
     transforms: "Transforms"
@@ -42,7 +43,7 @@ run:
     post_folder: "Post"
 
   preprocess_flair:
-    atlas_path: "/path/to/atlas/GG-853-FLAIR-0.7mm.nii"
+    atlas_path: "/path/to/reference_or_atlas_FLAIR.nii.gz"
     sequence: "FLAIR"
     steps:
       - n4
@@ -55,3 +56,11 @@ run:
       - fcm
       - whitestripe
 
+  difference_images:
+    source_timepoint: "Post"
+    reference_timepoint: "Pre"
+    image_pattern: "*_R.nii*"
+    output_suffix: "_diff"
+    histogram_levels: 256
+    match_points: 10
+    threshold_at_mean: true
