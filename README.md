@@ -82,6 +82,7 @@ run:
     - split-normalizations
 
   folders:
+    patients: "Patients"
     split_sequences: "By_Sequence"
     preprocessed_flair: "Preprocessed_FLAIR"
     difference_images: "Difference_Images"
@@ -94,7 +95,7 @@ run:
     post: "Post"
 ```
 
-Folder names are relative to `--output`.
+Most folder names are relative to `--output`. The `patients` folder is used when the input has a top-level `Patients/` folder.
 
 Example:
 
@@ -124,7 +125,42 @@ run:
 
 ## Supported Input Layouts
 
-### Multiple Patients
+### Recommended Layout: Patients and Transforms
+
+```text
+Input/
+  Patients/
+    Patient_001/
+      Pre/
+        Patient_001_FLAIR.nii.gz
+      Post/
+        Patient_001_FLAIR.nii.gz
+    Patient_002/
+      Pre/
+        Patient_002_FLAIR.nii.gz
+      Post/
+        Patient_002_FLAIR.nii.gz
+
+  Transforms/
+    Pre_Transformations/
+      Patient_001/
+        Patient_001_Pre_FLAIR_R.tfm
+    Post_Transformations/
+      Patient_001/
+        Patient_001_Post_FLAIR_R.tfm
+```
+
+Run:
+
+```bash
+python run_pipeline.py run --input "/data/Input" --output "/data/Output"
+```
+
+When `Input/Patients/` exists, preprocessing reads patient folders from there. Existing transforms are searched under `Input/Transforms/Pre_Transformations/` and `Input/Transforms/Post_Transformations/`.
+
+### Multiple Patients Without a Patients Folder
+
+This layout is also supported:
 
 ```text
 Input/
@@ -138,12 +174,6 @@ Input/
       Patient_002_FLAIR.nii.gz
     Post/
       Patient_002_FLAIR.nii.gz
-```
-
-Run:
-
-```bash
-python run_pipeline.py run --input "/data/Input" --output "/data/Output"
 ```
 
 ### Single Patient Folder
@@ -346,12 +376,12 @@ Transforms are saved under the selected `--output` folder:
 ```text
 Output/
   Transforms/
-    Pre/
+    Pre_Transformations/
       Patient_001/
-        Patient_001.tfm
-    Post/
+        Patient_001_FLAIR_R.tfm
+    Post_Transformations/
       Patient_001/
-        Patient_001.tfm
+        Patient_001_FLAIR_R.tfm
 ```
 
 The behavior is controlled by:
@@ -361,8 +391,8 @@ run:
   transforms:
     save: true
     overwrite: false
-    pre_folder: "Pre"
-    post_folder: "Post"
+    pre_folder: "Pre_Transformations"
+    post_folder: "Post_Transformations"
 ```
 
 Behavior:
@@ -378,6 +408,27 @@ overwrite: false
 overwrite: true
   Existing transforms are ignored and new transforms are estimated.
 ```
+
+If existing transforms are provided under the input folder, they are reused before a new registration is estimated:
+
+```text
+Input/
+  Transforms/
+    Pre_Transformations/
+      Patient_001/
+        existing_pre_transform.tfm
+    Post_Transformations/
+      Patient_001/
+        existing_post_transform.tfm
+```
+
+When an input transform is found, it is copied into the output transform folder using the standardized image-based name:
+
+```text
+Output/Transforms/Pre_Transformations/Patient_001/Patient_001_FLAIR_R.tfm
+```
+
+If no transform exists in either the output or input transform folder, the pipeline estimates a new transform and saves it under `Output/Transforms/`.
 
 ## Step: make-diff-images
 
@@ -593,15 +644,41 @@ _brain.nii.gz
 
 ## Common Workflows
 
-### Full FLAIR Workflow
+### Full FLAIR Workflow for Recommended Patients Layout
 
 ```bash
 python run_pipeline.py run \
   --input "/data/Input" \
   --output "/data/Output" \
-  --steps split-sequences preprocess-flair make-diff-images split-normalizations \
+  --steps preprocess-flair make-diff-images split-normalizations \
   --preprocess-steps n4 registration skull-strip normalization
 ```
+
+Use this when the input is already arranged as:
+
+```text
+Input/
+  Patients/
+    Patient_001/
+      Pre/
+      Post/
+  Transforms/
+    Pre_Transformations/
+    Post_Transformations/
+```
+
+### Sequence Organization for Mixed Raw Data
+
+Use `split-sequences` when the input contains mixed sequences that must first be organized:
+
+```bash
+python run_pipeline.py run \
+  --input "/data/RawMixedInput" \
+  --output "/data/Output" \
+  --steps split-sequences
+```
+
+The current `split-sequences` output is organized by timepoint and sequence under `Output/By_Sequence/`. If you want to preprocess FLAIR Pre/Post pairs afterward, arrange the FLAIR files into the recommended `Patients/Patient_ID/Pre` and `Patients/Patient_ID/Post` layout before running `preprocess-flair`.
 
 ### Add a New Patient to Existing Output Folders
 
@@ -609,7 +686,7 @@ Use the same output root as before:
 
 ```bash
 python run_pipeline.py run \
-  --input "/data/NewPatient_001" \
+  --input "/data/NewInputWithPatientsFolder" \
   --output "/data/Output" \
   --steps preprocess-flair make-diff-images split-normalizations
 ```
@@ -690,7 +767,7 @@ Check that:
 If this exists:
 
 ```text
-Output/Transforms/Pre/Patient_001/Patient_001.tfm
+Output/Transforms/Pre_Transformations/Patient_001/Patient_001_FLAIR_R.tfm
 ```
 
 and:

@@ -13,6 +13,7 @@ run:
     - split-normalizations
 
   folders:
+    patients: "Patients"
     split_sequences: "By_Sequence"
     preprocessed_flair: "Preprocessed_FLAIR"
     difference_images: "Difference_Images"
@@ -39,8 +40,8 @@ run:
   transforms:
     save: true
     overwrite: false
-    pre_folder: "Pre"
-    post_folder: "Post"
+    pre_folder: "Pre_Transformations"
+    post_folder: "Post_Transformations"
 
   preprocess_flair:
     atlas_path: "/path/to/reference_or_atlas_FLAIR.nii.gz"
@@ -61,6 +62,6 @@ run:
     reference_timepoint: "Pre"
     image_pattern: "*_R.nii*"
     output_suffix: "_diff"
-    histogram_levels: 256
+    histogram_levels: 512
     match_points: 10
     threshold_at_mean: true

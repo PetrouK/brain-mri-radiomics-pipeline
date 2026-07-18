@@ -6,6 +6,7 @@ from mri_pipeline.utils.files import ensure_dir, is_nifti
 from mri_pipeline.organize.split_sequences import organize_mri_files
 from mri_pipeline.organize.split_normalizations import organize_by_normalization
 from mri_pipeline.preprocessing.flair_pipeline import (
+    build_registration_transform_path,
     find_patient_transform,
     preprocess_flair_folder,
     run_flair_pipeline,
@@ -160,7 +161,11 @@ def run_flair_file_preprocessing(
 
     save_transform_path = None
     if transforms_config.get("save", True):
-        save_transform_path = transform_root / patient_id / f"{patient_id}.tfm"
+        save_transform_path = build_registration_transform_path(
+            transform_root,
+            patient_id,
+            image_path,
+        )
 
     return run_flair_pipeline(
         image_path=image_path,
@@ -224,12 +229,20 @@ def run_pipeline_steps(config,
                     preprocess_steps=preprocess_steps,
                 )
             else:
+                patients_folder = folders_config.get("patients")
+                preprocessing_input = input_root
+
+                if patients_folder is not None and (input_root / patients_folder).is_dir():
+                    preprocessing_input = input_root / patients_folder
+
                 created_files = preprocess_flair_folder(
-                    input_root=input_root,
+                    input_root=preprocessing_input,
                     output_root=output_preprocessed,
                     atlas_path=flair_config["atlas_path"],
                     pre_transform_root=output_transforms / transforms_config["pre_folder"],
                     post_transform_root=output_transforms / transforms_config["post_folder"],
+                    input_pre_transform_root=input_root / folders_config["transforms"] / transforms_config["pre_folder"],
+                    input_post_transform_root=input_root / folders_config["transforms"] / transforms_config["post_folder"],
                     timepoints=timepoints_config,
                     sequence=flair_config.get("sequence", "FLAIR"),
                     steps=preprocess_steps or flair_config["steps"],

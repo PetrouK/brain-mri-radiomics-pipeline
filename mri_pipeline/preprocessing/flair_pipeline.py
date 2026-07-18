@@ -1,4 +1,5 @@
 from pathlib import Path
+import shutil
 
 from mri_pipeline.preprocessing.n4 import run_n4_bias_correction
 from mri_pipeline.preprocessing.registration import register_image
@@ -10,6 +11,7 @@ from mri_pipeline.utils.files import (
     get_patient_dirs,
     list_nifti_files,
     find_first_tfm,
+    strip_nifti_extension,
 )
 
 try:
@@ -141,6 +143,40 @@ def find_sequence_image(folder, sequence="FLAIR"):
 
     return files[0] if files else None
 
+def build_registration_transform_path(transform_root, patient_id, image_path):
+    image_path = Path(image_path)
+    transform_root = Path(transform_root)
+
+    transform_name = f"{strip_nifti_extension(image_path)}_R.tfm"
+
+    return transform_root / patient_id / transform_name
+
+def copy_transform_to_output(source_transform_path, output_transform_path):
+    source_transform_path = Path(source_transform_path)
+    output_transform_path = Path(output_transform_path)
+
+    ensure_dir(output_transform_path.parent)
+    shutil.copy2(source_transform_path, output_transform_path)
+
+    return output_transform_path
+
+def prepare_transform_for_image(output_transform_root, input_transform_root, patient_id, image_path):
+    output_transform_path = build_registration_transform_path(
+        output_transform_root,
+        patient_id,
+        image_path,
+    )
+
+    if output_transform_path.exists():
+        return output_transform_path
+
+    input_transform_path = find_patient_transform(input_transform_root, patient_id)
+
+    if input_transform_path is not None:
+        return copy_transform_to_output(input_transform_path, output_transform_path)
+
+    return None
+
 def find_patient_transform(transform_root, patient_id):
     if transform_root is None:
         return None
@@ -236,6 +272,8 @@ def preprocess_flair_folder(
     atlas_path,
     pre_transform_root=None,
     post_transform_root=None,
+    input_pre_transform_root=None,
+    input_post_transform_root=None,
     timepoints=None,
     sequence="FLAIR",
     steps=None,
@@ -250,6 +288,12 @@ def preprocess_flair_folder(
 
     pre_folder_name = timepoints.get("pre", "Pre")
     post_folder_name = timepoints.get("post", "Post")
+
+    if input_pre_transform_root is None:
+        input_pre_transform_root = input_root / "Transforms" / pre_folder_name
+
+    if input_post_transform_root is None:
+        input_post_transform_root = input_root / "Transforms" / post_folder_name
 
     if (input_root / pre_folder_name).is_dir() or (input_root / post_folder_name).is_dir():
         patient_folders = [input_root]
@@ -290,18 +334,38 @@ def preprocess_flair_folder(
         post_save_transform_path = None
 
         if save_transforms and pre_transform_root is not None:
-            pre_save_transform_path = Path(pre_transform_root) / patient_id / f"{patient_id}.tfm"
+            pre_save_transform_path = build_registration_transform_path(
+                pre_transform_root,
+                patient_id,
+                pre_image_path,
+            )
 
-        if save_transforms and post_transform_root is not None:
-            post_save_transform_path = Path(post_transform_root) / patient_id / f"{patient_id}.tfm"
-
+        if save_transforms and post_transform_root is not None and post_image_path is not None:
+            post_save_transform_path = build_registration_transform_path(
+                post_transform_root,
+                patient_id,
+                post_image_path,
+            )
         if overwrite_transforms:
             pre_transform_path = None
             post_transform_path = None
         else:
-            pre_transform_path = find_patient_transform(pre_transform_root, patient_id)
-            post_transform_path = find_patient_transform(post_transform_root, patient_id)
+            pre_transform_path = prepare_transform_for_image(
+                output_transform_root=pre_transform_root,
+                input_transform_root=input_pre_transform_root,
+                patient_id=patient_id,
+                image_path=pre_image_path,
+            )
 
+            if post_image_path is not None:
+                post_transform_path = prepare_transform_for_image(
+                    output_transform_root=post_transform_root,
+                    input_transform_root=input_post_transform_root,
+                    patient_id=patient_id,
+                    image_path=post_image_path,
+                )
+            else:
+                post_transform_path = None
         patient_results = preprocess_flair_patient(
             patient_id=patient_id,
             pre_image_path=pre_image_path,
