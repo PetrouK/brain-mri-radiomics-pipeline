@@ -5,6 +5,7 @@ from mri_pipeline.preprocessing.n4 import run_n4_bias_correction
 from mri_pipeline.preprocessing.registration import register_image
 from mri_pipeline.preprocessing.skull_strip import build_hdbet_mask_path, run_skull_stripping
 from mri_pipeline.preprocessing.normalization import run_normalization
+from mri_pipeline.preprocessing.diff_images import create_registered_difference_pair
 from mri_pipeline.utils.files import (
     build_output_path,
     ensure_dir,
@@ -214,6 +215,7 @@ def preprocess_flair_patient(
     post_transform_path=None,
     pre_save_transform_path=None,
     post_save_transform_path=None,
+    diff_output_root=None,
     steps=None,
     normalization_methods=None,
 ):
@@ -222,6 +224,10 @@ def preprocess_flair_patient(
 
     if normalization_methods is None:
         normalization_methods = []
+
+    normalized_steps = [step.lower() for step in steps]
+    image_steps = [step for step in normalized_steps if step != "diff"]
+    run_diff = "diff" in normalized_steps
 
     output_root = Path(output_root)
     patient_output_root = ensure_dir(output_root / patient_id)
@@ -236,7 +242,7 @@ def preprocess_flair_patient(
 
     results["pre"] = run_flair_pipeline(
         image_path=pre_image_path,
-        steps=steps,
+        steps=image_steps,
         reference_path=atlas_path,
         transform_path=pre_transform_path,
         save_transform_path=pre_save_transform_path,
@@ -256,13 +262,27 @@ def preprocess_flair_patient(
 
     results["post"] = run_flair_pipeline(
         image_path=post_image_path,
-        steps=steps,
+        steps=image_steps,
         reference_path=post_reference_path,
         transform_path=post_transform_path,
         save_transform_path=post_save_transform_path,
         output_dir=post_output_dir,
         normalization_methods=normalization_methods,
     )
+    
+    if run_diff:
+        if diff_output_root is None:
+            diff_output_root = output_root.parent / "Difference_Images"
+
+        pre_diff_image = results["pre"].get("brain") or results["pre"].get("registered") or results["pre"]["final_image"]
+        post_diff_image = results["post"].get("brain") or results["post"].get("registered") or results["post"]["final_image"]
+
+        results["diff"] = create_registered_difference_pair(
+            reference_path=pre_diff_image,
+            source_path=post_diff_image,
+            output_root=Path(diff_output_root) / patient_id,
+            register_if_needed=False,
+        )
 
     return results
 
@@ -274,6 +294,7 @@ def preprocess_flair_folder(
     post_transform_root=None,
     input_pre_transform_root=None,
     input_post_transform_root=None,
+    diff_output_root=None,
     timepoints=None,
     sequence="FLAIR",
     steps=None,
@@ -376,6 +397,7 @@ def preprocess_flair_folder(
             post_transform_path=post_transform_path,
             pre_save_transform_path=pre_save_transform_path,
             post_save_transform_path=post_save_transform_path,
+            diff_output_root=diff_output_root,
             steps=steps,
             normalization_methods=normalization_methods,
         )

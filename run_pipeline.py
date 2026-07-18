@@ -35,6 +35,7 @@ PREPROCESS_STEPS = [
     "n4",
     "registration",
     "skull-strip",
+    "diff",
     "normalization",
 ]
 
@@ -243,6 +244,7 @@ def run_pipeline_steps(config,
                     post_transform_root=output_transforms / transforms_config["post_folder"],
                     input_pre_transform_root=input_root / folders_config["transforms"] / transforms_config["pre_folder"],
                     input_post_transform_root=input_root / folders_config["transforms"] / transforms_config["post_folder"],
+                    diff_output_root=output_diff,
                     timepoints=timepoints_config,
                     sequence=flair_config.get("sequence", "FLAIR"),
                     steps=preprocess_steps or flair_config["steps"],
