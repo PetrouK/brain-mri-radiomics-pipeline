@@ -16,3 +16,6 @@ env/
 Thumbs.db
 
 README_GR.md
+
+tools/
+config.local.yaml

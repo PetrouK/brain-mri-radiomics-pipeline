@@ -16,6 +16,11 @@ from mri_pipeline.preprocessing.diff_images import (
     create_flair_difference_images,
     create_registered_difference_pair,
 )
+from mri_pipeline.lesions.flames import segment_pre_lesions_folder, segment_lesions_folder
+
+from mri_pipeline.preprocessing.synthseg_masks import create_white_matter_masks
+
+from mri_pipeline.lesions.mask_cleaning import clean_roi_masks_folder
 
 try:
     from tqdm.auto import tqdm
@@ -29,6 +34,9 @@ RUN_STEPS = [
     "preprocess-flair",
     "make-diff-images",
     "split-normalizations",
+    "segment-pre-lesions",
+    "segment-lesions",
+    "segment-white-matter",
 ]
 
 PREPROCESS_STEPS = [
@@ -50,7 +58,10 @@ def build_parser():
             "preprocess-flair",
             "make-diff-images",
             "make-synthseg-masks",
-            "make-nawm-masks",
+            "segment-pre-lesions",
+            "segment-lesions",
+            "segment-white-matter",
+            "clean-roi-masks",
             "run",
         ],
         help="Pipeline step to run",
@@ -81,9 +92,21 @@ def build_parser():
     )
 
     parser.add_argument(
+        "--lesion-folder",
+        default="Existing_Pre",
+        help="Output folder name under Lesions for FLAMeS lesion masks.",
+    )
+
+    parser.add_argument(
         "--diff-register-missing",
         action="store_true",
         help="Register missing Pre/Post pairs before creating difference images.",
+    )
+
+    parser.add_argument(
+        "--registered-only",
+        action="store_true",
+        help="For white matter segmentation, use only registered images before skull stripping.",
     )
 
     parser.add_argument(
@@ -113,6 +136,34 @@ def build_parser():
     parser.add_argument(
         "--source",
         help="Source image for standalone difference image creation.",
+    )
+
+    parser.add_argument(
+        "--roi-root",
+        help="Folder with ROI masks to clean, organized by case/patient.",
+    )
+
+    parser.add_argument(
+        "--allowed-root",
+        help="Folder with allowed masks, for example white matter masks, organized by case/patient.",
+    )
+
+    parser.add_argument(
+        "--exclusion-root",
+        help="Optional folder with exclusion masks, organized by case/patient.",
+    )
+
+    parser.add_argument(
+        "--exclusion-dilation",
+        type=int,
+        default=1,
+        help="Voxel radius used to dilate exclusion masks before removing them.",
+    )
+
+    parser.add_argument(
+        "--suffix",
+        default="_cleaned",
+        help="Suffix added to cleaned ROI mask filenames.",
     )
 
     return parser
@@ -186,6 +237,8 @@ def run_pipeline_steps(config,
                        copy_files=True, 
                        preprocess_steps=None,
                        diff_register_missing=False,
+                       registered_only=False,
+                       lesion_folder="Existing_Pre",
                        ):
     
     run_config = config["run"]
@@ -292,6 +345,59 @@ def run_pipeline_steps(config,
             )
 
             summary[step] = created_files
+
+        if step == "segment-pre-lesions":
+            if "preprocess-flair" in summary:
+                lesions_input = output_preprocessed
+            else:
+                lesions_input = input_root
+
+            flames_config = config["run"]["flames"]
+
+            created_masks = segment_pre_lesions_folder(
+                preprocessed_root=lesions_input,
+                output_root=output_root,
+                pre_timepoint=timepoints_config.get("pre", "Pre"),
+                flames_root=flames_config.get("root"),
+            )
+
+            summary[step] = created_masks
+
+        if step == "segment-white-matter":
+            if "preprocess-flair" in summary:
+                white_matter_input = output_preprocessed
+                white_matter_registered_only = True
+            else:
+                white_matter_input = input_root
+                white_matter_registered_only = registered_only
+
+            synthseg_config = config["run"]["synthseg"]
+
+            created_masks = create_white_matter_masks(
+                input_root=white_matter_input,
+                output_root=output_root,
+                synthseg_work_root=output_root / "SynthSeg_Work",
+                python_executable=synthseg_config.get("python_executable", "python"),
+                script_path=synthseg_config["script_path"],
+                keepgeom=synthseg_config.get("keepgeom", True),
+                version=synthseg_config.get("version", "auto"),
+                keep_intermediate=synthseg_config.get("keep_intermediate", False),
+                registered_only=white_matter_registered_only,
+            )
+
+            summary[step] = created_masks
+
+        if step == "segment-lesions":
+            flames_config = config["run"]["flames"]
+
+            created_masks = segment_lesions_folder(
+                input_root=input_root,
+                output_root=output_root,
+                lesion_folder=lesion_folder,
+                flames_root=flames_config.get("root"),
+            )
+
+            summary[step] = created_masks
             
     return summary
 
@@ -331,6 +437,8 @@ def main():
             copy_files=copy_files,
             preprocess_steps=args.preprocess_steps,
             diff_register_missing=args.diff_register_missing,
+            registered_only=args.registered_only,
+            lesion_folder=args.lesion_folder,
         )
         print("Run complete.")
         print(summarize_run(summary))
@@ -430,6 +538,24 @@ def main():
         print(result)
         return
 
+    if args.command == "segment-lesions":
+        if not args.input:
+            parser.error("segment-lesions requires --input")
+        if not args.output:
+            parser.error("segment-lesions requires --output")
+
+        flames_config = config["run"]["flames"]
+
+        created_masks = segment_lesions_folder(
+            input_root=args.input,
+            output_root=args.output,
+            lesion_folder=args.lesion_folder,
+            flames_root=flames_config.get("root"),
+        )
+
+        print(f"Created {len(created_masks)} lesion masks.")
+        return
+
     if args.command == "make-synthseg-masks":
         from mri_pipeline.preprocessing.synthseg_masks import create_synthseg_masks
 
@@ -448,20 +574,24 @@ def main():
         print(f"Created {len(created_files)} SynthSeg masks.")
         return
 
-    if args.command == "make-nawm-masks":
-        from mri_pipeline.preprocessing.nawm import create_nawm_masks
+    if args.command == "clean-roi-masks":
+        if not args.roi_root:
+            parser.error("clean-roi-masks requires --roi-root")
+        if not args.allowed_root:
+            parser.error("clean-roi-masks requires --allowed-root")
+        if not args.output:
+            parser.error("clean-roi-masks requires --output")
 
-        nawm_config = config["nawm_masks"]
-
-        created_files = create_nawm_masks(
-            wm_root=nawm_config["wm_root"],
-            lesion_root=nawm_config["lesion_root"],
-            output_root=nawm_config["output_root"],
-            wm_pattern=nawm_config.get("wm_pattern", "*_wm_mask.nii.gz"),
-            lesion_pattern=nawm_config.get("lesion_pattern", "*_mask_thr0.nii"),
+        created_files = clean_roi_masks_folder(
+            roi_root=args.roi_root,
+            allowed_root=args.allowed_root,
+            output_root=args.output,
+            exclusion_root=args.exclusion_root,
+            exclusion_dilation=args.exclusion_dilation,
+            suffix=args.suffix,
         )
 
-        print(f"Created {len(created_files)} NAWM masks.")
+        print(f"Created {len(created_files)} cleaned ROI masks.")
         return
 
 

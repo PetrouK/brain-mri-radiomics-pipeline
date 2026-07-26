@@ -65,3 +65,16 @@ run:
     histogram_levels: 512
     match_points: 10
     threshold_at_mean: true
+
+  flames:
+    root: "/path/to/FLAMeS"
+    dataset_id: "004"
+    configuration: "3d_fullres"
+    trainer: "nnUNetTrainer_8000epochs"
+
+  synthseg:
+    python_executable: "/path/to/synthseg/python"
+    script_path: "/path/to/SynthSeg_predict.py"
+    keepgeom: false
+    version: "auto"
+    keep_intermediate: false
