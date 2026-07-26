@@ -58,8 +58,8 @@ For longitudinal lesion radiomics, the recommended order is:
 
 1. Register Pre and Post FLAIR images.
 2. Review the registered Post image.
-3. Manually segment Post/new lesions on the registered Post image.
-4. Generate Pre/existing lesion masks and white matter masks in the same image space.
+3. Generate Pre lesion masks and white matter masks in the same space.
+4. Manually segment Post/new lesions on the registered Post image.
 5. Clean manual Post lesion masks using white matter and exclusion masks.
 6. Generate and clean mirrored healthy control ROIs.
 7. Extract radiomics features from lesion and healthy control ROIs.
