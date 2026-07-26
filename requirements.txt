@@ -1,24 +1,22 @@
-# Core configuration and image processing
+# Core runtime
 PyYAML>=6.0
-numpy>=1.24
-scipy>=1.10
-nibabel>=5.0
-SimpleITK>=2.3
 tqdm>=4.66
 
-# Used only to choose CUDA/MPS/CPU for HD-BET.
+# Medical image IO and processing
+SimpleITK>=2.3
+nibabel>=5.0
+numpy>=1.24
+scipy>=1.10
+
+# Device detection for HD-BET skull stripping
 torch>=2.0
 
-# Skull stripping. The pipeline calls the external "hd-bet" command.
-# If pip installation fails, install HD-BET from its official repository
-# and confirm that "hd-bet --help" works in the active environment.
-HD-BET
-
-# Radiomics export and tabular outputs.
+# Optional downstream radiomics/table export
 pyradiomics>=3.0
 pandas>=2.0
 openpyxl>=3.1
 
-# External tools not installed by pip:
-# - Docker, needed for SynthSeg mask creation.
-# - FreeSurfer SynthSeg Docker image: freesurfer/freesurfer:8.2.0.
+# External tools used by specific steps, not bundled in this repository:
+# - HD-BET: the "hd-bet" command must be available for skull stripping.
+# - FLAMeS / nnU-Net v2: configure run.flames.root in config.yaml.
+# - SynthSeg: configure run.synthseg.python_executable and run.synthseg.script_path in config.yaml.
