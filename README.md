@@ -224,8 +224,8 @@ Output/Transforms/Post_Transformations/Patient_ID/
 
 ## Notes
 
-- Use dummy/example paths in `config.yaml` before sharing the repository publicly.
-- Keep personal paths in `config.local.yaml`; this file is ignored by Git.
+- The pipeline uses `config.yaml` by default.
+- For local runs, either edit `config.yaml` with your own paths or pass a private ignored config file with `--config config.local.yaml`.
 - Large data files, models, NIfTI images, transforms, and tool folders should not be committed to Git.
 - `tools/` can be used locally for FLAMeS or SynthSeg, but it should remain ignored by Git.
 - HD-BET, nnU-Net, FLAMeS, and SynthSeg may print their own progress messages.
