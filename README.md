@@ -2,6 +2,14 @@
 
 Command-line pipeline for organizing and preprocessing brain MRI data, with a focus on FLAIR images, lesion masks, white matter masks, and Pre/Post comparison workflows.
 
+## Project Aim
+
+The aim of this project is to support radiomics analysis of multiple sclerosis lesions that are visible on Post/follow-up MRI but not visible on the corresponding Pre/baseline MRI.
+
+In this workflow, Post/new lesion masks are expected to be manually segmented. The pipeline provides preprocessing, registration, Pre/Post difference image generation, pre-existing lesion segmentation, white matter segmentation, ROI cleaning, and preparation for downstream radiomics extraction.
+
+Manual segmentation of Post/new lesions should preferably be performed after registration, using the registered Post image in the same spatial space as the Pre/baseline image. This helps ensure that manual Post lesion masks, Pre lesion masks, white matter masks, mirrored healthy ROIs, and radiomics measurements are aligned in a common image space.
+
 The main entry point is:
 
 ```bash
@@ -43,6 +51,18 @@ Some steps require external tools:
 - SynthSeg for white matter segmentation.
 
 These tools are not included in the repository. Configure their local paths in `config.yaml`.
+
+## Recommended Manual Segmentation Workflow
+
+For longitudinal lesion radiomics, the recommended order is:
+
+1. Register Pre and Post FLAIR images.
+2. Review the registered Post image.
+3. Manually segment Post/new lesions on the registered Post image.
+4. Generate Pre/existing lesion masks and white matter masks in the same image space.
+5. Clean manual Post lesion masks using white matter and exclusion masks.
+6. Generate and clean mirrored healthy control ROIs.
+7. Extract radiomics features from lesion and healthy control ROIs.
 
 ## Recommended Input Layout
 
