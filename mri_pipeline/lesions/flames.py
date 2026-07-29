@@ -141,12 +141,16 @@ def segment_pre_lesions_file(image_path, output_root, case_folder_name=None, fla
         flames_root=flames_root,
     )
 
-def segment_pre_lesions_folder(preprocessed_root, output_root, pre_timepoint="Pre", flames_root=None):
+def segment_pre_lesions_folder(
+    preprocessed_root,
+    output_root,
+    pre_timepoint="Pre",
+    flames_root=None,
+):
     preprocessed_root = Path(preprocessed_root)
     output_root = Path(output_root)
 
     created_masks = []
-
     for case_folder in get_patient_dirs(preprocessed_root):
         case_folder_name = case_folder.name
         pre_folder = case_folder / pre_timepoint
@@ -170,7 +174,12 @@ def segment_pre_lesions_folder(preprocessed_root, output_root, pre_timepoint="Pr
 
     return created_masks
 
-def segment_lesions_folder(input_root, output_root, lesion_folder="Existing_Pre", flames_root=None):
+def segment_lesions_folder(
+    input_root,
+    output_root,
+    lesion_folder="Existing_Pre",
+    flames_root=None,
+):
     input_root = Path(input_root)
     output_root = Path(output_root)
 

@@ -40,7 +40,13 @@ def transfer_file(src, dst, copy_mode=True):
 
     return dst
 
-def organize_mri_files(input_root, output_root, timepoints, sequences, copy_files=True):
+def organize_mri_files(
+    input_root,
+    output_root,
+    timepoints,
+    sequences,
+    copy_files=True,
+):
 
     input_root = Path(input_root)
     output_root = Path(output_root)

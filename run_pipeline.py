@@ -5,7 +5,6 @@ from mri_pipeline.utils.config import load_config
 from mri_pipeline.utils.files import ensure_dir, is_nifti
 from mri_pipeline.organize.split_sequences import organize_mri_files
 from mri_pipeline.organize.split_normalizations import organize_by_normalization
-from mri_pipeline.utils.progress_window import create_progress_window
 
 try:
     from tqdm.auto import tqdm
@@ -482,6 +481,7 @@ def main():
             registered_only=args.registered_only,
             lesion_folder=args.lesion_folder,
         )
+
         print("Run complete.")
         print(summarize_run(summary))
         return
@@ -673,20 +673,15 @@ def main():
             parser.error("extract-radiomics requires --discretization-values")
 
         output_root = args.output or Path(args.roi_root) / "Radiomics"
-        progress = create_progress_window("Progress")
-        try:
-            output_files = extract_radiomics_features(
-                image_root=args.image_root,
-                roi_root=args.roi_root,
-                output_root=output_root,
-                discretization_mode=args.discretization_mode,
-                discretization_values=args.discretization_values,
-                values_are_target_bins=args.values_are_target_bins,
-                max_workers=args.max_workers,
-                progress=progress,
-            )
-        finally:
-            progress.close()
+        output_files = extract_radiomics_features(
+            image_root=args.image_root,
+            roi_root=args.roi_root,
+            output_root=output_root,
+            discretization_mode=args.discretization_mode,
+            discretization_values=args.discretization_values,
+            values_are_target_bins=args.values_are_target_bins,
+            max_workers=args.max_workers,
+        )
 
         print(f"Created {len(output_files)} radiomics feature files.")
         for output_file in output_files:

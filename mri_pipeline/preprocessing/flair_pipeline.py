@@ -328,14 +328,12 @@ def preprocess_flair_folder(
     results = []
 
     print(f"{len(patient_folders)} patient folders found.")
-
     for patient_index, patient_folder in enumerate(
         tqdm(patient_folders, desc="FLAIR patients", unit="patient"),
         start=1,
     ):
         patient_id = patient_folder.name
         print(f"Patient {patient_index}/{len(patient_folders)} preprocessing: {patient_id}")
-
         pre_folder = patient_folder / pre_folder_name
         if not pre_folder.exists() or not pre_folder.is_dir():
             pre_folder = patient_folder

@@ -233,4 +233,3 @@ def create_flair_difference_images(
 
 
     
-

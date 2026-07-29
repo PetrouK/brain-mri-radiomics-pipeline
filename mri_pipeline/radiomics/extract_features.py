@@ -3,7 +3,6 @@ from radiomics import featureextractor
 import SimpleITK as sitk
 import pandas as pd
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from mri_pipeline.utils.progress_window import NullProgress
 
 from mri_pipeline.utils.files import ensure_dir, get_patient_dirs, list_nifti_files
 
@@ -213,11 +212,7 @@ def extract_radiomics_features(
         discretization_values,
         values_are_target_bins=False,
         max_workers=1,
-        progress=None,
     ):
-
-    if progress is None:
-        progress = NullProgress()
 
     jobs = collect_radiomics_jobs(image_root, roi_root)
 
@@ -226,23 +221,15 @@ def extract_radiomics_features(
 
 
     grouped_jobs = group_jobs_by_case(jobs)
-    total_values = len(discretization_values)
-    total_cases = len(grouped_jobs) 
     output_root = ensure_dir(output_root)
     output_files = []
 
-    for value_index, input_value in enumerate(discretization_values, start=1):
+    for input_value in discretization_values:
         resolved_value = resolve_discretization_value(jobs, discretization_mode, input_value, values_are_target_bins)
 
         rows = []
         if max_workers == 1:
-            for case_index, (case_id, case_jobs) in enumerate(grouped_jobs.items(), start=1):
-                progress.update(
-                    task="Radiomics extraction",
-                    message=f"Value {value_index}/{total_values}: {discretization_mode} {input_value} | Case {case_index}/{total_cases}: {case_id}",
-                    current=case_index,
-                    total=total_cases,
-                )
+            for case_jobs in grouped_jobs.values():
                 case_rows = process_radiomics_case(
                     case_jobs=case_jobs,
                     discretization_mode=discretization_mode,
@@ -255,30 +242,19 @@ def extract_radiomics_features(
                     rows.append(row)
         else:
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                future_to_case = {}
+                futures = []
 
-                for case_id, case_jobs in grouped_jobs.items():
+                for case_jobs in grouped_jobs.values():
                     future = executor.submit(
                         process_radiomics_case,
                         case_jobs,
                         discretization_mode,
                         resolved_value,
                     )
-                    future_to_case[future] = case_id
+                    futures.append(future)
 
-                completed_cases = 0
-
-                for future in as_completed(future_to_case):
-                    case_id = future_to_case[future]
+                for future in as_completed(futures):
                     case_rows = future.result()
-                    completed_cases += 1
-
-                    progress.update(
-                        task="Radiomics extraction",
-                        message=f"Value {value_index}/{total_values}: {discretization_mode} {input_value} | Completed {completed_cases}/{total_cases}: {case_id}",
-                        current=completed_cases,
-                        total=total_cases,
-                    )
 
                     for row in case_rows:
                         row["InputValue"] = input_value
