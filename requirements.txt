@@ -11,7 +11,7 @@ scipy>=1.10
 # Device detection for HD-BET skull stripping
 torch>=2.0
 
-# Optional downstream radiomics/table export
+# Radiomics extraction and table export
 pyradiomics>=3.0
 pandas>=2.0
 openpyxl>=3.1

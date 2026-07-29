@@ -27,6 +27,8 @@ Most settings live in `config.yaml`; input and output roots are provided from th
 - Segment lesion masks with FLAMeS.
 - Generate white matter masks with SynthSeg.
 - Clean manual ROI masks using white matter and exclusion masks.
+- Mirror lesion masks to create healthy control ROIs.
+- Extract PyRadiomics features from any ROI label folder structure.
 - Organize normalized outputs into Pre and Post folders.
 
 ## Installation
@@ -184,6 +186,39 @@ python run_pipeline.py clean-roi-masks --roi-root "/data/Lesions/New_Manual" --a
 
 Use `--exclusion-dilation 0` to remove only overlapping voxels. Use `--exclusion-dilation 1` to also remove voxels touching the exclusion mask.
 
+Mirror ROI masks, for example to create healthy control ROIs from manually segmented lesion masks:
+
+```bash
+python run_pipeline.py mirror-roi-masks --input "/data/Lesions/New_Cleaned" --output "/data/ROIs/Healthy"
+```
+
+Extract radiomics features:
+
+```bash
+python run_pipeline.py extract-radiomics --image-root "/data/Images" --roi-root "/data/ROIs" --output "/data/Radiomics" --discretization-mode binCount --discretization-values 32 64 128 --max-workers 8
+```
+
+Use direct `binWidth` values:
+
+```bash
+python run_pipeline.py extract-radiomics --image-root "/data/Images" --roi-root "/data/ROIs" --output "/data/Radiomics" --discretization-mode binWidth --discretization-values 5 10 20 --max-workers 8
+```
+
+Use target bin counts to compute `binWidth` from the average ROI intensity range:
+
+```bash
+python run_pipeline.py extract-radiomics --image-root "/data/Images" --roi-root "/data/ROIs" --output "/data/Radiomics" --discretization-mode binWidth --discretization-values 32 64 128 --values-are-target-bins --max-workers 8
+```
+
+Radiomics outputs are written as one Excel file per discretization value, for example:
+
+```text
+Radiomics/
+  Features_binCount_32.xlsx
+  Features_binCount_64.xlsx
+  Features_binWidth_targetBins_128.xlsx
+```
+
 ## Pipeline Steps
 
 Available `run --steps` values:
@@ -202,6 +237,8 @@ Standalone ROI cleaning command:
 
 ```text
 clean-roi-masks
+mirror-roi-masks
+extract-radiomics
 ```
 
 Step order matters. For a full FLAIR/lesion workflow, a practical order is:
@@ -216,6 +253,50 @@ split-normalizations
 
 Manual new lesion masks can then be cleaned with `clean-roi-masks` before radiomics extraction.
 
+## Radiomics Input Layout
+
+Radiomics extraction expects images and ROI masks to be linked by the same case folder name. The folder name does not need to be a real patient ID; it only needs to match between images and ROIs.
+
+```text
+Images/
+  case_001/
+    image.nii.gz
+  case_002/
+    image.nii.gz
+
+ROIs/
+  Lesions/
+    case_001/
+      lesion_1.nii.gz
+      lesion_2.nii.gz
+    case_002/
+      lesion_1.nii.gz
+
+  Healthy/
+    case_001/
+      healthy_1.nii.gz
+    case_002/
+      healthy_1.nii.gz
+```
+
+The first folder level under `ROIs/` becomes the ROI label in the output table. For example, `Lesions`, `Healthy`, `NAWM`, or any custom folder name will be written to the `ROI_Label` column.
+
+Each mask becomes one row in the output feature table. If a case has five lesion masks and five healthy masks, the result will contain ten rows for that case per discretization value.
+
+Radiomics extraction uses the following feature classes by default:
+
+```text
+shape
+firstorder
+glcm
+glrlm
+glszm
+gldm
+ngtdm
+```
+
+Only the original image type is enabled. Images are not normalized or resampled inside PyRadiomics by default.
+
 ## Output Overview
 
 Typical output:
@@ -228,8 +309,11 @@ Output/
     Existing_Pre/
     Post_FLAMeS/
     New_Cleaned/
+  ROIs/
+    Healthy/
   Masks/
     White_Matter/
+  Radiomics/
   Organized_Pre/
   Organized_Post/
   Transforms/
@@ -265,6 +349,8 @@ This repository does not redistribute the source code, pretrained models, or mod
 * Dereskewicz, E., La Rosa, F., Dos Santos Silva, J., et al. (2025). A novel convolutional neural network for automated multiple sclerosis brain lesion segmentation. *Journal of Neuroimaging, 35*(5), e70085. https://doi.org/10.1111/jon.70085
 
 * Isensee, F., Jaeger, P. F., Kohl, S. A. A., Petersen, J., & Maier-Hein, K. H. (2021). nnU-Net: A self-configuring method for deep learning-based biomedical image segmentation. *Nature Methods, 18*(2), 203-211. https://doi.org/10.1038/s41592-020-01008-z
+
+* van Griethuysen, J. J. M., Fedorov, A., Parmar, C., Hosny, A., Aucoin, N., Narayan, V., Beets-Tan, R. G. H., Fillion-Robin, J. C., Pieper, S., & Aerts, H. J. W. L. (2017). Computational radiomics system to decode the radiographic phenotype. *Cancer Research, 77*(21), e104-e107. https://doi.org/10.1158/0008-5472.CAN-17-0339
 
 ## Troubleshooting
 

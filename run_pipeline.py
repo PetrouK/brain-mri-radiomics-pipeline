@@ -21,6 +21,8 @@ from mri_pipeline.lesions.flames import segment_pre_lesions_folder, segment_lesi
 from mri_pipeline.preprocessing.synthseg_masks import create_white_matter_masks
 
 from mri_pipeline.lesions.mask_cleaning import clean_roi_masks_folder
+from mri_pipeline.lesions.mirror_rois import mirror_roi_masks
+from mri_pipeline.radiomics.extract_features import extract_radiomics_features
 
 try:
     from tqdm.auto import tqdm
@@ -62,6 +64,8 @@ def build_parser():
             "segment-lesions",
             "segment-white-matter",
             "clean-roi-masks",
+            "mirror-roi-masks",
+            "extract-radiomics",
             "run",
         ],
         help="Pipeline step to run",
@@ -165,6 +169,45 @@ def build_parser():
         default="_cleaned",
         help="Suffix added to cleaned ROI mask filenames.",
     )
+
+    parser.add_argument(
+        "--mirror-axis",
+        type=int,
+        default=2,
+        help="Numpy axis used for left-right ROI mirroring.",
+    )
+
+    parser.add_argument(
+        "--image-root",
+        help="Folder with MRI images organized by case.",
+    )
+
+    parser.add_argument(
+        "--discretization-mode",
+        choices=["binWidth", "binCount"],
+        help="Radiomics discretization mode.",
+    )
+
+    parser.add_argument(
+        "--discretization-values",
+        nargs="+",
+        type=float,
+        help="One or more binWidth/binCount values.",
+    )
+
+    parser.add_argument(
+        "--values-are-target-bins",
+        action="store_true",
+        help="For binWidth mode, treat values as target bin counts and compute binWidth from ROI ranges.",
+    )
+
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=1,
+        help="Number of parallel workers for radiomics extraction.",
+    )
+
 
     return parser
 
@@ -592,6 +635,49 @@ def main():
         )
 
         print(f"Created {len(created_files)} cleaned ROI masks.")
+        return
+
+    if args.command == "mirror-roi-masks":
+        if not args.input:
+            parser.error("mirror-roi-masks requires --input")
+        if not args.output:
+            parser.error("mirror-roi-masks requires --output")
+
+        created_files = mirror_roi_masks(
+            input_path=args.input,
+            output_root=args.output,
+            suffix=args.suffix,
+            axis=args.mirror_axis,
+        )
+
+        print(f"Created {len(created_files)} mirrored ROI masks.")
+        return
+
+    if args.command == "extract-radiomics":
+        if not args.image_root:
+            parser.error("extract-radiomics requires --image-root")
+        if not args.roi_root:
+            parser.error("extract-radiomics requires --roi-root")
+        if not args.output:
+            parser.error("extract-radiomics requires --output")
+        if not args.discretization_mode:
+            parser.error("extract-radiomics requires --discretization-mode")
+        if not args.discretization_values:
+            parser.error("extract-radiomics requires --discretization-values")
+
+        output_files = extract_radiomics_features(
+            image_root=args.image_root,
+            roi_root=args.roi_root,
+            output_root=args.output,
+            discretization_mode=args.discretization_mode,
+            discretization_values=args.discretization_values,
+            values_are_target_bins=args.values_are_target_bins,
+            max_workers=args.max_workers,
+        )
+
+        print(f"Created {len(output_files)} radiomics feature files.")
+        for output_file in output_files:
+            print(f"  -> {output_file}")
         return
 
 
