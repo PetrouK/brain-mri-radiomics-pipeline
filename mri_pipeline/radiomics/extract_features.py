@@ -3,8 +3,11 @@ from radiomics import featureextractor
 import SimpleITK as sitk
 import pandas as pd
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from mri_pipeline.utils.progress_window import NullProgress
 
 from mri_pipeline.utils.files import ensure_dir, get_patient_dirs, list_nifti_files
+
+IGNORED_ROI_LABEL_FOLDERS = {"radiomics"}
 
 
 def make_binary_mask(mask):
@@ -21,7 +24,10 @@ def collect_radiomics_jobs(
     jobs = []
 
     cases = get_patient_dirs(image_root)
-    roi_label_folders = get_patient_dirs(roi_root)
+    roi_label_folders = [
+        folder for folder in get_patient_dirs(roi_root)
+        if folder.name.lower() not in IGNORED_ROI_LABEL_FOLDERS
+    ]
 
     for case in cases:
         case_id = case.name
@@ -115,7 +121,9 @@ def resolve_discretization_value(
     values_are_target_bins=False,
 ):
     if discretization_mode == "binCount":
-        return input_value
+        if int(input_value) != input_value:
+            raise ValueError(f"binCount must be an integer value. Got: {input_value}")
+        return int(input_value)
 
     if discretization_mode != "binWidth":
         raise ValueError(f"Unknown discretization mode: {discretization_mode}")
@@ -140,6 +148,13 @@ def resolve_discretization_value(
     average_roi_range = sum(roi_ranges) / len(roi_ranges)
 
     return average_roi_range / input_value
+
+
+def format_discretization_value(value):
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+
+    return str(value).replace(".", "p")
 
 
 
@@ -198,7 +213,11 @@ def extract_radiomics_features(
         discretization_values,
         values_are_target_bins=False,
         max_workers=1,
+        progress=None,
     ):
+
+    if progress is None:
+        progress = NullProgress()
 
     jobs = collect_radiomics_jobs(image_root, roi_root)
 
@@ -207,15 +226,23 @@ def extract_radiomics_features(
 
 
     grouped_jobs = group_jobs_by_case(jobs)
+    total_values = len(discretization_values)
+    total_cases = len(grouped_jobs) 
     output_root = ensure_dir(output_root)
     output_files = []
 
-    for input_value in discretization_values:
+    for value_index, input_value in enumerate(discretization_values, start=1):
         resolved_value = resolve_discretization_value(jobs, discretization_mode, input_value, values_are_target_bins)
 
         rows = []
         if max_workers == 1:
-            for case_id, case_jobs in grouped_jobs.items():
+            for case_index, (case_id, case_jobs) in enumerate(grouped_jobs.items(), start=1):
+                progress.update(
+                    task="Radiomics extraction",
+                    message=f"Value {value_index}/{total_values}: {discretization_mode} {input_value} | Case {case_index}/{total_cases}: {case_id}",
+                    current=case_index,
+                    total=total_cases,
+                )
                 case_rows = process_radiomics_case(
                     case_jobs=case_jobs,
                     discretization_mode=discretization_mode,
@@ -228,7 +255,7 @@ def extract_radiomics_features(
                     rows.append(row)
         else:
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                futures = []
+                future_to_case = {}
 
                 for case_id, case_jobs in grouped_jobs.items():
                     future = executor.submit(
@@ -237,10 +264,21 @@ def extract_radiomics_features(
                         discretization_mode,
                         resolved_value,
                     )
-                    futures.append(future)
+                    future_to_case[future] = case_id
 
-                for future in futures:
+                completed_cases = 0
+
+                for future in as_completed(future_to_case):
+                    case_id = future_to_case[future]
                     case_rows = future.result()
+                    completed_cases += 1
+
+                    progress.update(
+                        task="Radiomics extraction",
+                        message=f"Value {value_index}/{total_values}: {discretization_mode} {input_value} | Completed {completed_cases}/{total_cases}: {case_id}",
+                        current=completed_cases,
+                        total=total_cases,
+                    )
 
                     for row in case_rows:
                         row["InputValue"] = input_value
@@ -249,10 +287,11 @@ def extract_radiomics_features(
 
         df = pd.DataFrame(rows)
 
+        value_name = format_discretization_value(input_value)
         if discretization_mode == "binWidth" and values_are_target_bins:
-            output_file = output_root / f"Features_binWidth_targetBins_{input_value}.xlsx"
+            output_file = output_root / f"Features_binWidth_targetBins_{value_name}.xlsx"
         else:
-            output_file = output_root / f"Features_{discretization_mode}_{input_value}.xlsx"
+            output_file = output_root / f"Features_{discretization_mode}_{value_name}.xlsx"
 
         df.to_excel(output_file, index=False)
         output_files.append(output_file)

@@ -54,6 +54,26 @@ Some steps require external tools:
 
 These tools are not included in the repository. Configure their local paths in `config.yaml`.
 
+### Radiomics Environment
+
+Radiomics extraction uses PyRadiomics, which is best installed in a separate Python environment. This avoids conflicts with deep learning tools such as HD-BET, FLAMeS, nnU-Net, and SynthSeg.
+
+Recommended setup:
+
+```bash
+conda create -n radiomics_env python=3.10 -y
+conda activate radiomics_env
+pip install -r requirements-radiomics.txt
+```
+
+Then run only the radiomics step from this environment:
+
+```bash
+python run_pipeline.py extract-radiomics --image-root "/data/Images" --roi-root "/data/ROIs" --discretization-mode binCount --discretization-values 32
+```
+
+PyRadiomics `3.0.1` may fail to build on Python `3.12+` because of deprecated build-time configuration code. Use Python `3.10` or `3.11` for the radiomics environment.
+
 ## Recommended Manual Segmentation Workflow
 
 For longitudinal lesion radiomics, the recommended order is:

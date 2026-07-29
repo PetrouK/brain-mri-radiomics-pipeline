@@ -5,24 +5,7 @@ from mri_pipeline.utils.config import load_config
 from mri_pipeline.utils.files import ensure_dir, is_nifti
 from mri_pipeline.organize.split_sequences import organize_mri_files
 from mri_pipeline.organize.split_normalizations import organize_by_normalization
-from mri_pipeline.preprocessing.flair_pipeline import (
-    build_registration_transform_path,
-    find_patient_transform,
-    preprocess_flair_folder,
-    run_flair_pipeline,
-)
-
-from mri_pipeline.preprocessing.diff_images import (
-    create_flair_difference_images,
-    create_registered_difference_pair,
-)
-from mri_pipeline.lesions.flames import segment_pre_lesions_folder, segment_lesions_folder
-
-from mri_pipeline.preprocessing.synthseg_masks import create_white_matter_masks
-
-from mri_pipeline.lesions.mask_cleaning import clean_roi_masks_folder
-from mri_pipeline.lesions.mirror_rois import mirror_roi_masks
-from mri_pipeline.radiomics.extract_features import extract_radiomics_features
+from mri_pipeline.utils.progress_window import create_progress_window
 
 try:
     from tqdm.auto import tqdm
@@ -233,6 +216,12 @@ def run_flair_file_preprocessing(
     flair_config,
     preprocess_steps,
 ):
+    from mri_pipeline.preprocessing.flair_pipeline import (
+        build_registration_transform_path,
+        find_patient_transform,
+        run_flair_pipeline,
+    )
+
     image_path = Path(image_path)
 
     if not image_path.exists() or not image_path.is_file() or not is_nifti(image_path):
@@ -315,6 +304,8 @@ def run_pipeline_steps(config,
             summary[step] = created_files
 
         if step == "preprocess-flair":
+            from mri_pipeline.preprocessing.flair_pipeline import preprocess_flair_folder
+
             if input_root.is_file():
                 created_files = run_flair_file_preprocessing(
                     image_path=input_root,
@@ -369,6 +360,8 @@ def run_pipeline_steps(config,
             summary[step] = created_files
 
         if step == "make-diff-images":
+            from mri_pipeline.preprocessing.diff_images import create_flair_difference_images
+
             diff_config = run_config.get("difference_images", {})
 
             if "preprocess-flair" in summary:
@@ -390,6 +383,8 @@ def run_pipeline_steps(config,
             summary[step] = created_files
 
         if step == "segment-pre-lesions":
+            from mri_pipeline.lesions.flames import segment_pre_lesions_folder
+
             if "preprocess-flair" in summary:
                 lesions_input = output_preprocessed
             else:
@@ -407,6 +402,8 @@ def run_pipeline_steps(config,
             summary[step] = created_masks
 
         if step == "segment-white-matter":
+            from mri_pipeline.preprocessing.synthseg_masks import create_white_matter_masks
+
             if "preprocess-flair" in summary:
                 white_matter_input = output_preprocessed
                 white_matter_registered_only = True
@@ -431,6 +428,8 @@ def run_pipeline_steps(config,
             summary[step] = created_masks
 
         if step == "segment-lesions":
+            from mri_pipeline.lesions.flames import segment_lesions_folder
+
             flames_config = config["run"]["flames"]
 
             created_masks = segment_lesions_folder(
@@ -558,6 +557,8 @@ def main():
         return
 
     if args.command == "make-diff-images":
+        from mri_pipeline.preprocessing.diff_images import create_registered_difference_pair
+
         if not args.reference:
             parser.error("make-diff-images requires --reference")
         if not args.source:
@@ -582,6 +583,8 @@ def main():
         return
 
     if args.command == "segment-lesions":
+        from mri_pipeline.lesions.flames import segment_lesions_folder
+
         if not args.input:
             parser.error("segment-lesions requires --input")
         if not args.output:
@@ -618,6 +621,8 @@ def main():
         return
 
     if args.command == "clean-roi-masks":
+        from mri_pipeline.lesions.mask_cleaning import clean_roi_masks_folder
+
         if not args.roi_root:
             parser.error("clean-roi-masks requires --roi-root")
         if not args.allowed_root:
@@ -638,6 +643,8 @@ def main():
         return
 
     if args.command == "mirror-roi-masks":
+        from mri_pipeline.lesions.mirror_rois import mirror_roi_masks
+
         if not args.input:
             parser.error("mirror-roi-masks requires --input")
         if not args.output:
@@ -654,26 +661,32 @@ def main():
         return
 
     if args.command == "extract-radiomics":
+        from mri_pipeline.radiomics.extract_features import extract_radiomics_features
+
         if not args.image_root:
             parser.error("extract-radiomics requires --image-root")
         if not args.roi_root:
             parser.error("extract-radiomics requires --roi-root")
-        if not args.output:
-            parser.error("extract-radiomics requires --output")
         if not args.discretization_mode:
             parser.error("extract-radiomics requires --discretization-mode")
         if not args.discretization_values:
             parser.error("extract-radiomics requires --discretization-values")
 
-        output_files = extract_radiomics_features(
-            image_root=args.image_root,
-            roi_root=args.roi_root,
-            output_root=args.output,
-            discretization_mode=args.discretization_mode,
-            discretization_values=args.discretization_values,
-            values_are_target_bins=args.values_are_target_bins,
-            max_workers=args.max_workers,
-        )
+        output_root = args.output or Path(args.roi_root) / "Radiomics"
+        progress = create_progress_window("Progress")
+        try:
+            output_files = extract_radiomics_features(
+                image_root=args.image_root,
+                roi_root=args.roi_root,
+                output_root=output_root,
+                discretization_mode=args.discretization_mode,
+                discretization_values=args.discretization_values,
+                values_are_target_bins=args.values_are_target_bins,
+                max_workers=args.max_workers,
+                progress=progress,
+            )
+        finally:
+            progress.close()
 
         print(f"Created {len(output_files)} radiomics feature files.")
         for output_file in output_files:

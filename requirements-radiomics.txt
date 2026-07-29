@@ -1,0 +1,8 @@
+# Recommended with Python 3.10 or 3.11.
+# PyRadiomics 3.0.1 may fail to build on Python 3.12+.
+pyradiomics==3.0.1
+SimpleITK>=2.3
+numpy<2
+pandas>=2.0
+openpyxl>=3.1
+tqdm>=4.66
