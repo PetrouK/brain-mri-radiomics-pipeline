@@ -190,12 +190,20 @@ def create_flair_difference_images(
     match_points=10,
     threshold_at_mean=True,
     register_missing=False,
+    case_ids=None,
     ):
 
     preprocessed_root = Path(preprocessed_root)
     output_root = Path(output_root)
 
     patients  = get_patient_dirs(preprocessed_root)
+
+    if case_ids is not None:
+        case_ids = set(case_ids)
+        patients = [
+            patient for patient in patients
+            if patient.name in case_ids
+        ]
 
     results=[]
     for patient in patients:

@@ -261,6 +261,41 @@ def run_flair_file_preprocessing(
     )
 
 
+def collect_case_ids_from_outputs(outputs, output_root):
+    output_root = Path(output_root)
+    case_ids = set()
+
+    def visit(value):
+        if value is None:
+            return
+
+        if isinstance(value, dict):
+            for item in value.values():
+                visit(item)
+            return
+
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                visit(item)
+            return
+
+        try:
+            path = Path(value)
+        except TypeError:
+            return
+
+        try:
+            relative_path = path.relative_to(output_root)
+        except ValueError:
+            return
+
+        if relative_path.parts:
+            case_ids.add(relative_path.parts[0])
+
+    visit(outputs)
+    return case_ids
+
+
 def run_pipeline_steps(config, 
                        input_root, 
                        output_root, 
@@ -339,6 +374,10 @@ def run_pipeline_steps(config,
                     overwrite_transforms=transforms_config.get("overwrite", False),
                 )
             summary[step] = created_files
+            summary["processed_case_ids"] = collect_case_ids_from_outputs(
+                created_files,
+                output_preprocessed,
+            )
 
         if step == "split-normalizations":
             if "preprocess-flair" in summary:
@@ -377,6 +416,7 @@ def run_pipeline_steps(config,
                 match_points=diff_config.get("match_points", 10),
                 threshold_at_mean=diff_config.get("threshold_at_mean", True),
                 register_missing=diff_register_missing,
+                case_ids=summary.get("processed_case_ids") if "preprocess-flair" in summary else None,
             )
 
             summary[step] = created_files
