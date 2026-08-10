@@ -10,6 +10,10 @@ In this workflow, Post/new lesion masks are expected to be manually segmented. T
 
 Manual segmentation of Post/new lesions should preferably be performed after registration, using the registered Post image in the same spatial space as the Pre/baseline image. This helps ensure that manual Post lesion masks, Pre lesion masks, white matter masks, mirrored healthy ROIs, and radiomics measurements are aligned in a common image space.
 
+## Research Use Notice
+
+This project is intended for research use only. It is not a clinical diagnostic tool and should not be used for clinical decision-making without independent validation.
+
 The main entry point is:
 
 ```bash
@@ -371,6 +375,10 @@ This repository does not redistribute the source code, pretrained models, or mod
 * Isensee, F., Jaeger, P. F., Kohl, S. A. A., Petersen, J., & Maier-Hein, K. H. (2021). nnU-Net: A self-configuring method for deep learning-based biomedical image segmentation. *Nature Methods, 18*(2), 203-211. https://doi.org/10.1038/s41592-020-01008-z
 
 * van Griethuysen, J. J. M., Fedorov, A., Parmar, C., Hosny, A., Aucoin, N., Narayan, V., Beets-Tan, R. G. H., Fillion-Robin, J. C., Pieper, S., & Aerts, H. J. W. L. (2017). Computational radiomics system to decode the radiographic phenotype. *Cancer Research, 77*(21), e104-e107. https://doi.org/10.1158/0008-5472.CAN-17-0339
+
+## License
+
+This project is released under the MIT License. See `LICENSE` for details.
 
 ## Troubleshooting
 

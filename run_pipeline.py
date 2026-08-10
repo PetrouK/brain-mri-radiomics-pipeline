@@ -527,11 +527,19 @@ def main():
         return
 
     if args.command == "split-sequences":
+        if not args.input:
+            parser.error("split-sequences requires --input")
+        if not args.output:
+            parser.error("split-sequences requires --output")
+
+        run_config = config["run"]
+        folders_config = run_config["folders"]
+
         created_files = organize_mri_files(
-            input_root=config["raw_root"],
-            output_root=config["split_sequences_output_root"],
-            timepoints=config["timepoints"],
-            sequences=config["sequences"],
+            input_root=args.input,
+            output_root=Path(args.output) / folders_config["split_sequences"],
+            timepoints=list(run_config["timepoints"].values()),
+            sequences=run_config["sequences"],
             copy_files=copy_files,
         )
 
@@ -539,11 +547,23 @@ def main():
         return
 
     if args.command == "split-normalizations":
+        if not args.input:
+            parser.error("split-normalizations requires --input")
+        if not args.output:
+            parser.error("split-normalizations requires --output")
+
+        run_config = config["run"]
+        folders_config = run_config["folders"]
+        timepoints_config = run_config["timepoints"]
+
         created_files = organize_by_normalization(
-            source_root=config["pre_flair_root"],
-            target_root=config["organized_pre_root"],
-            normalizations=config["normalizations"],
+            source_root=args.input,
+            normalizations=run_config["normalizations"],
             copy_files=copy_files,
+            pre_target_root=Path(args.output) / folders_config["organized_pre"],
+            post_target_root=Path(args.output) / folders_config["organized_post"],
+            pre_name=timepoints_config.get("pre", "Pre"),
+            post_name=timepoints_config.get("post", "Post"),
         )
 
         print(f"Created {len(created_files)} files.")
