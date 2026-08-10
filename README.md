@@ -14,6 +14,8 @@ Manual segmentation of Post/new lesions should preferably be performed after reg
 
 This project is intended for research use only. It is not a clinical diagnostic tool and should not be used for clinical decision-making without independent validation.
 
+The workflow has been tested on brain MRI data acquired on a 3 Tesla MRI system.
+
 The main entry point is:
 
 ```bash
