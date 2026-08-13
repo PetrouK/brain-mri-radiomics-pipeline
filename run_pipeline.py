@@ -328,8 +328,14 @@ def run_pipeline_steps(config,
 
     for step in tqdm(steps, desc="Run steps", unit="step"):
         if step == "split-sequences":
+            patients_folder = folders_config.get("patients")
+            sequence_input = input_root
+
+            if patients_folder is not None and (input_root / patients_folder).is_dir():
+                sequence_input = input_root / patients_folder
+
             created_files = organize_mri_files(
-                input_root,
+                sequence_input,
                 output_seq,
                 list(timepoints_config.values()),
                 run_config["sequences"],
@@ -534,9 +540,15 @@ def main():
 
         run_config = config["run"]
         folders_config = run_config["folders"]
+        input_root = Path(args.input)
+        patients_folder = folders_config.get("patients")
+        sequence_input = input_root
+
+        if patients_folder is not None and (input_root / patients_folder).is_dir():
+            sequence_input = input_root / patients_folder
 
         created_files = organize_mri_files(
-            input_root=args.input,
+            input_root=sequence_input,
             output_root=Path(args.output) / folders_config["split_sequences"],
             timepoints=list(run_config["timepoints"].values()),
             sequences=run_config["sequences"],
