@@ -86,6 +86,7 @@ def clean_roi_mask_file(
         exclusion_mask_path=None,
         exclusion_dilation=1,
         suffix="_cleaned",
+        overwrite_existing=False,
     ):
 
     roi_mask_path = Path(roi_mask_path)
@@ -93,6 +94,10 @@ def clean_roi_mask_file(
     output_root = Path(output_root)
 
     output_path = build_cleaned_mask_path(output_root, roi_mask_path, suffix)
+    if output_path.exists() and not overwrite_existing:
+        print(f"[Skip] Cleaned ROI mask already exists: {output_path}")
+        return output_path
+
 
     output_path = clean_roi_mask(
         roi_mask_path=roi_mask_path,
@@ -124,6 +129,7 @@ def clean_roi_masks_folder(
         exclusion_root=None,
         exclusion_dilation=1,
         suffix="_cleaned",
+        overwrite_existing=False,
     ):
 
     roi_root = Path(roi_root)
@@ -164,6 +170,7 @@ def clean_roi_masks_folder(
             exclusion_mask_path=exclusion_mask_path,
             exclusion_dilation=exclusion_dilation,
             suffix=suffix,
+            overwrite_existing=overwrite_existing,
         )
         created_files.append(output_path)
 

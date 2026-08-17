@@ -53,6 +53,24 @@ def build_pair_output_dir(output_root):
     ensure_dir(pair_dir)
     return pair_dir
 
+def find_existing_difference_pair(output_root):
+    output_root = Path(output_root)
+
+    if not output_root.exists() or not output_root.is_dir():
+        return None
+
+    for difference_path in sorted(output_root.rglob("difference.nii*")):
+        pair_dir = difference_path.parent
+        return {
+            "reference": pair_dir / "reference.nii.gz",
+            "source_registered": pair_dir / "source_registered.nii.gz",
+            "difference": difference_path,
+            "transform": pair_dir / "source_to_reference.tfm",
+            "registration_applied": (pair_dir / "source_to_reference.tfm").exists(),
+        }
+
+    return None
+
 def create_histogram_difference(
         source_path,
         reference_path,
@@ -103,11 +121,18 @@ def create_registered_difference_pair(
         match_points=10,
         threshold_at_mean=True,
         register_if_needed=True,
+        overwrite_existing=False,
     ):
 
     source_path = Path(source_path)
     reference_path = Path(reference_path)
     output_root = Path(output_root)
+
+    if not overwrite_existing:
+        existing_pair = find_existing_difference_pair(output_root)
+        if existing_pair is not None:
+            print(f"[Skip] Difference image already exists: {existing_pair['difference']}")
+            return existing_pair
 
     pair_dir = build_pair_output_dir(output_root)
 
@@ -191,6 +216,7 @@ def create_flair_difference_images(
     threshold_at_mean=True,
     register_missing=False,
     case_ids=None,
+    overwrite_existing=False,
     ):
 
     preprocessed_root = Path(preprocessed_root)
@@ -222,6 +248,13 @@ def create_flair_difference_images(
             continue
         
         output_patient_root = output_root / patient_id
+        if not overwrite_existing:
+            existing_pair = find_existing_difference_pair(output_patient_root)
+            if existing_pair is not None:
+                print(f"[Skip] Difference image already exists for {patient_id}: {existing_pair['difference']}")
+                results.append(existing_pair)
+                continue
+
         result = create_registered_difference_pair(
                 reference_path=pre_image,
                 source_path=post_image,
@@ -229,7 +262,8 @@ def create_flair_difference_images(
                 histogram_levels=histogram_levels,
                 match_points=match_points,
                 threshold_at_mean=threshold_at_mean,
-                register_if_needed=register_missing
+                register_if_needed=register_missing,
+                overwrite_existing=overwrite_existing,
             )
         
         results.append(result)

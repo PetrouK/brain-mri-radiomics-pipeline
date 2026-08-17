@@ -212,6 +212,7 @@ def extract_radiomics_features(
         discretization_values,
         values_are_target_bins=False,
         max_workers=1,
+        overwrite_existing=False,
     ):
 
     jobs = collect_radiomics_jobs(image_root, roi_root)
@@ -225,6 +226,17 @@ def extract_radiomics_features(
     output_files = []
 
     for input_value in discretization_values:
+        value_name = format_discretization_value(input_value)
+        if discretization_mode == "binWidth" and values_are_target_bins:
+            output_file = output_root / f"Features_binWidth_targetBins_{value_name}.xlsx"
+        else:
+            output_file = output_root / f"Features_{discretization_mode}_{value_name}.xlsx"
+
+        if output_file.exists() and not overwrite_existing:
+            print(f"[Skip] Radiomics features already exist: {output_file}")
+            output_files.append(output_file)
+            continue
+
         resolved_value = resolve_discretization_value(jobs, discretization_mode, input_value, values_are_target_bins)
 
         rows = []
@@ -262,13 +274,6 @@ def extract_radiomics_features(
                         rows.append(row)
 
         df = pd.DataFrame(rows)
-
-        value_name = format_discretization_value(input_value)
-        if discretization_mode == "binWidth" and values_are_target_bins:
-            output_file = output_root / f"Features_binWidth_targetBins_{value_name}.xlsx"
-        else:
-            output_file = output_root / f"Features_{discretization_mode}_{value_name}.xlsx"
-
         df.to_excel(output_file, index=False)
         output_files.append(output_file)
 

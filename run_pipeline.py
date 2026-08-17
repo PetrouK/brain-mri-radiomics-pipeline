@@ -190,6 +190,12 @@ def build_parser():
         help="Number of parallel workers for radiomics extraction.",
     )
 
+    parser.add_argument(
+        "--overwrite-existing",
+        action="store_true",
+        help="Overwrite existing output files instead of skipping them.",
+    )
+
 
     return parser
 
@@ -305,6 +311,7 @@ def run_pipeline_steps(config,
                        diff_register_missing=False,
                        registered_only=False,
                        lesion_folder="Existing_Pre",
+                       overwrite_existing=False,
                        ):
     
     run_config = config["run"]
@@ -423,6 +430,7 @@ def run_pipeline_steps(config,
                 threshold_at_mean=diff_config.get("threshold_at_mean", True),
                 register_missing=diff_register_missing,
                 case_ids=summary.get("processed_case_ids") if "preprocess-flair" in summary else None,
+                overwrite_existing=overwrite_existing,
             )
 
             summary[step] = created_files
@@ -442,6 +450,7 @@ def run_pipeline_steps(config,
                 output_root=output_root,
                 pre_timepoint=timepoints_config.get("pre", "Pre"),
                 flames_root=flames_config.get("root"),
+                overwrite_existing=overwrite_existing,
             )
 
             summary[step] = created_masks
@@ -468,6 +477,7 @@ def run_pipeline_steps(config,
                 version=synthseg_config.get("version", "auto"),
                 keep_intermediate=synthseg_config.get("keep_intermediate", False),
                 registered_only=white_matter_registered_only,
+                overwrite_existing=overwrite_existing,
             )
 
             summary[step] = created_masks
@@ -482,6 +492,7 @@ def run_pipeline_steps(config,
                 output_root=output_root,
                 lesion_folder=lesion_folder,
                 flames_root=flames_config.get("root"),
+                overwrite_existing=overwrite_existing,
             )
 
             summary[step] = created_masks
@@ -526,6 +537,7 @@ def main():
             diff_register_missing=args.diff_register_missing,
             registered_only=args.registered_only,
             lesion_folder=args.lesion_folder,
+            overwrite_existing=args.overwrite_existing,
         )
 
         print("Run complete.")
@@ -648,6 +660,7 @@ def main():
             match_points=diff_config.get("match_points", 10),
             threshold_at_mean=diff_config.get("threshold_at_mean", True),
             register_if_needed=True,
+            overwrite_existing=args.overwrite_existing,
         )
 
         print("Difference image complete.")
@@ -669,9 +682,37 @@ def main():
             output_root=args.output,
             lesion_folder=args.lesion_folder,
             flames_root=flames_config.get("root"),
+            overwrite_existing=args.overwrite_existing,
         )
 
         print(f"Created {len(created_masks)} lesion masks.")
+        return
+
+    if args.command == "segment-white-matter":
+        from mri_pipeline.preprocessing.synthseg_masks import create_white_matter_masks
+
+        if not args.input:
+            parser.error("segment-white-matter requires --input")
+        if not args.output:
+            parser.error("segment-white-matter requires --output")
+
+        synthseg_config = config["run"]["synthseg"]
+        output_root = Path(args.output)
+
+        created_masks = create_white_matter_masks(
+            input_root=args.input,
+            output_root=output_root,
+            synthseg_work_root=output_root / "SynthSeg_Work",
+            python_executable=synthseg_config.get("python_executable", "python"),
+            script_path=synthseg_config["script_path"],
+            keepgeom=synthseg_config.get("keepgeom", True),
+            version=synthseg_config.get("version", "auto"),
+            keep_intermediate=synthseg_config.get("keep_intermediate", False),
+            registered_only=args.registered_only,
+            overwrite_existing=args.overwrite_existing,
+        )
+
+        print(f"Created {len(created_masks)} white matter masks.")
         return
 
     if args.command == "make-synthseg-masks":
@@ -709,6 +750,7 @@ def main():
             exclusion_root=args.exclusion_root,
             exclusion_dilation=args.exclusion_dilation,
             suffix=args.suffix,
+            overwrite_existing=args.overwrite_existing,
         )
 
         print(f"Created {len(created_files)} cleaned ROI masks.")
@@ -727,6 +769,7 @@ def main():
             output_root=args.output,
             suffix=args.suffix,
             axis=args.mirror_axis,
+            overwrite_existing=args.overwrite_existing,
         )
 
         print(f"Created {len(created_files)} mirrored ROI masks.")
@@ -753,6 +796,7 @@ def main():
             discretization_values=args.discretization_values,
             values_are_target_bins=args.values_are_target_bins,
             max_workers=args.max_workers,
+            overwrite_existing=args.overwrite_existing,
         )
 
         print(f"Created {len(output_files)} radiomics feature files.")

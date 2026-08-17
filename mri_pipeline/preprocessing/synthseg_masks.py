@@ -235,6 +235,48 @@ def stage_synthseg_batch_inputs(synthseg_inputs, staging_input_dir):
     return mapping
 
 
+def get_synthseg_region_output_paths(case_id, timepoint, image_path, output_roots, regions):
+    original_stem = strip_nifti_extension(image_path)
+    output_paths = []
+
+    for region in regions:
+        region_output_root = output_roots.get(region)
+        if region_output_root is None:
+            continue
+
+        output_dir = Path(region_output_root) / case_id
+        if timepoint is not None:
+            output_dir = output_dir / timepoint
+
+        output_paths.append(output_dir / f"{original_stem}{REGION_SUFFIXES[region]}")
+
+    return output_paths
+
+
+def filter_existing_synthseg_inputs(synthseg_inputs, output_roots, regions, overwrite_existing=False):
+    pending_inputs = []
+    existing_outputs = []
+
+    for case_id, timepoint, image_path in synthseg_inputs:
+        output_paths = get_synthseg_region_output_paths(
+            case_id=case_id,
+            timepoint=timepoint,
+            image_path=image_path,
+            output_roots=output_roots,
+            regions=regions,
+        )
+
+        if output_paths and all(path.exists() for path in output_paths) and not overwrite_existing:
+            case_label = f"{case_id}/{timepoint}" if timepoint is not None else case_id
+            print(f"[Skip] SynthSeg masks already exist for {case_label}: {Path(image_path).name}")
+            existing_outputs.extend(output_paths)
+            continue
+
+        pending_inputs.append((case_id, timepoint, image_path))
+
+    return pending_inputs, existing_outputs
+
+
 
 def extract_region_mask(synthseg_path, labels, output_path):
     synthseg_path = Path(synthseg_path)
@@ -290,6 +332,7 @@ def create_synthseg_masks(
     resample_to_input=True,
     registered_only=False,
     timepoint_names=("Pre", "Post"),
+    overwrite_existing=False,
 ):
 
     if script_path is None:
@@ -327,6 +370,17 @@ def create_synthseg_masks(
     )
 
     print(f"{len(synthseg_inputs)} SynthSeg input images found.")
+
+    if not synthseg_inputs:
+        return created_files
+
+    synthseg_inputs, existing_outputs = filter_existing_synthseg_inputs(
+        synthseg_inputs=synthseg_inputs,
+        output_roots=output_roots,
+        regions=regions,
+        overwrite_existing=overwrite_existing,
+    )
+    created_files.extend(existing_outputs)
 
     if not synthseg_inputs:
         return created_files
@@ -370,13 +424,15 @@ def create_synthseg_masks(
                 print(f"  [Warning] No output root configured for region: {region}")
                 continue
 
-            output_dir = Path(region_output_root) / case_id
-            if timepoint is not None:
-                output_dir = output_dir / timepoint
+            output_path = get_synthseg_region_output_paths(
+                case_id=case_id,
+                timepoint=timepoint,
+                image_path=image_path,
+                output_roots=output_roots,
+                regions=[region],
+            )[0]
 
-            output_path = output_dir / f"{original_stem}{REGION_SUFFIXES[region]}"
-
-            if output_path.exists():
+            if output_path.exists() and not overwrite_existing:
                 print(f"  [Skip] Mask exists: {output_path.name}")
                 created_file = output_path
             else:
@@ -411,6 +467,7 @@ def create_white_matter_masks(
         resample_to_input=True,
         keep_intermediate=False,
         registered_only=False,
+        overwrite_existing=False,
     ):
     
     input_root = Path(input_root)
@@ -433,6 +490,7 @@ def create_white_matter_masks(
         resample_to_input=resample_to_input,
         registered_only=registered_only,
         timepoint_names=("Pre", "Post"),
+        overwrite_existing=overwrite_existing,
     )
 
     if not keep_intermediate:

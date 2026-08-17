@@ -107,7 +107,19 @@ def copy_flames_segmap(raw_mask_path, final_output_dir, image_path):
 
     return output_path
 
-def segment_lesions_file(image_path, output_root, lesion_folder="Existing_Pre", case_folder_name=None, flames_root=None):
+def build_flames_final_mask_path(final_output_dir, image_path):
+    case_id = strip_nifti_extension(image_path)
+    return Path(final_output_dir) / f"{case_id}_segmap.nii.gz"
+
+def segment_lesions_file(
+    image_path,
+    output_root,
+    lesion_folder="Existing_Pre",
+    case_folder_name=None,
+    flames_root=None,
+    overwrite_existing=False,
+):
+    image_path = Path(image_path)
     output_root = Path(output_root)
     
     staging_input = output_root / "FLAMeS_Work" / "input"
@@ -117,6 +129,11 @@ def segment_lesions_file(image_path, output_root, lesion_folder="Existing_Pre", 
 
     if case_folder_name is not None:
         final_output_root = final_output_root / str(case_folder_name)
+
+    final_mask_path = build_flames_final_mask_path(final_output_root, image_path)
+    if final_mask_path.exists() and not overwrite_existing:
+        print(f"[Skip] FLAMeS mask already exists: {final_mask_path}")
+        return final_mask_path
 
     stage_flames_input(image_path, staging_input)
     run_flames_prediction(
@@ -132,13 +149,20 @@ def segment_lesions_file(image_path, output_root, lesion_folder="Existing_Pre", 
 
     return final_mask_path
 
-def segment_pre_lesions_file(image_path, output_root, case_folder_name=None, flames_root=None):
+def segment_pre_lesions_file(
+    image_path,
+    output_root,
+    case_folder_name=None,
+    flames_root=None,
+    overwrite_existing=False,
+):
     return segment_lesions_file(
         image_path=image_path,
         output_root=output_root,
         lesion_folder="Existing_Pre",
         case_folder_name=case_folder_name,
         flames_root=flames_root,
+        overwrite_existing=overwrite_existing,
     )
 
 def segment_pre_lesions_folder(
@@ -146,6 +170,7 @@ def segment_pre_lesions_folder(
     output_root,
     pre_timepoint="Pre",
     flames_root=None,
+    overwrite_existing=False,
 ):
     preprocessed_root = Path(preprocessed_root)
     output_root = Path(output_root)
@@ -168,6 +193,7 @@ def segment_pre_lesions_folder(
             output_root=output_root,
             case_folder_name=case_folder_name,
             flames_root=flames_root,
+            overwrite_existing=overwrite_existing,
         )
 
         created_masks.append(created_mask)
@@ -179,6 +205,7 @@ def segment_lesions_folder(
     output_root,
     lesion_folder="Existing_Pre",
     flames_root=None,
+    overwrite_existing=False,
 ):
     input_root = Path(input_root)
     output_root = Path(output_root)
@@ -198,6 +225,7 @@ def segment_lesions_folder(
             lesion_folder=lesion_folder,
             case_folder_name=case_folder_name,
             flames_root=flames_root,
+            overwrite_existing=overwrite_existing,
         )
 
         created_masks.append(created_mask)

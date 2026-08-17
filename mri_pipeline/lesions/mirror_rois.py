@@ -38,13 +38,17 @@ def build_mirrored_mask_path(input_mask_path, output_root, suffix="_mirrored"):
 
     return output_path
 
-def mirror_mask_file(input_mask_path, output_root, suffix="_mirrored", axis=2):
+def mirror_mask_file(input_mask_path, output_root, suffix="_mirrored", axis=2, overwrite_existing=False):
     output_path = build_mirrored_mask_path(input_mask_path, output_root, suffix)
+
+    if output_path.exists() and not overwrite_existing:
+        print(f"[Skip] Mirrored mask already exists: {output_path}")
+        return output_path
 
     return mirror_mask_left_right(input_mask_path, output_path, axis=axis)
 
 
-def mirror_roi_masks_folder(roi_root, output_root, suffix="_mirrored", axis=2):
+def mirror_roi_masks_folder(roi_root, output_root, suffix="_mirrored", axis=2, overwrite_existing=False):
     roi_root = Path(roi_root)
     output_root = Path(output_root)
 
@@ -59,13 +63,13 @@ def mirror_roi_masks_folder(roi_root, output_root, suffix="_mirrored", axis=2):
             continue
 
         case_output_root = output_root / case_id
-        created_mask = mirror_mask_file(input_mask_path, case_output_root, suffix, axis)
+        created_mask = mirror_mask_file(input_mask_path, case_output_root, suffix, axis, overwrite_existing)
         created_files.append(created_mask)
 
     return created_files
 
 
-def mirror_roi_masks(input_path, output_root, suffix="_mirrored", axis=2):
+def mirror_roi_masks(input_path, output_root, suffix="_mirrored", axis=2, overwrite_existing=False):
     input_path = Path(input_path)
     output_root = Path(output_root)
 
@@ -75,6 +79,7 @@ def mirror_roi_masks(input_path, output_root, suffix="_mirrored", axis=2):
             output_root=output_root,
             suffix=suffix,
             axis=axis,
+            overwrite_existing=overwrite_existing,
         )
         return [created_mask]
 
@@ -84,6 +89,7 @@ def mirror_roi_masks(input_path, output_root, suffix="_mirrored", axis=2):
             output_root=output_root,
             suffix=suffix,
             axis=axis,
+            overwrite_existing=overwrite_existing,
         )
 
     raise FileNotFoundError(f"Input path not found: {input_path}")
