@@ -210,6 +210,14 @@ Clean manual ROI masks, such as manually segmented new lesions:
 python run_pipeline.py clean-roi-masks --roi-root "/data/Lesions/New_Manual" --allowed-root "/data/Masks/White_Matter" --exclusion-root "/data/Lesions/Existing_Pre" --output "/data/Lesions/New_Cleaned"
 ```
 
+If the allowed, ROI, or exclusion masks are stored in nested `Pre`/`Post` folders, pass the corresponding timepoint. For example, to clean manually segmented Post/new lesion masks using Post white matter masks:
+
+```bash
+python run_pipeline.py clean-roi-masks --roi-root "/data/Masks/Lesions" --allowed-root "/data/Masks/White_Matter" --allowed-timepoint Post --exclusion-root "/data/Masks/Presegmented_maps/Lesions/Existing_Pre" --output "/data/Masks/Lesions_Cleaned"
+```
+
+The same command can use Pre white matter masks by changing `--allowed-timepoint Post` to `--allowed-timepoint Pre`. If the folders are not nested by timepoint, omit the timepoint arguments.
+
 Use `--exclusion-dilation 0` to remove only overlapping voxels. Use `--exclusion-dilation 1` to also remove voxels touching the exclusion mask.
 
 Mirror ROI masks, for example to create healthy control ROIs from manually segmented lesion masks:
@@ -266,6 +274,27 @@ clean-roi-masks
 mirror-roi-masks
 extract-radiomics
 ```
+
+`clean-roi-masks` supports both flat case folders and timepoint-specific folders:
+
+```text
+Masks/White_Matter/
+  case_001/
+    wm_mask.nii.gz
+```
+
+or:
+
+```text
+Masks/White_Matter/
+  case_001/
+    Pre/
+      pre_wm_mask.nii.gz
+    Post/
+      post_wm_mask.nii.gz
+```
+
+Use `--roi-timepoint`, `--allowed-timepoint`, or `--exclusion-timepoint` when a selected root contains nested `Pre`/`Post` folders.
 
 Step order matters. For a full FLAIR/lesion workflow, a practical order is:
 
@@ -339,6 +368,9 @@ Output/
     Healthy/
   Masks/
     White_Matter/
+      Patient_ID/
+        Pre/
+        Post/
   Radiomics/
   Organized_Pre/
   Organized_Post/
