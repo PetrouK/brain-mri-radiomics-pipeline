@@ -108,15 +108,23 @@ def clean_roi_mask_file(
     )
     return output_path
 
-def find_matching_mask(mask_root, case_id, pattern="*.nii*"):
+def find_matching_mask(mask_root, case_id, pattern="*.nii*", timepoint=None):
     mask_root = Path(mask_root)
     case_folder = mask_root / str(case_id)
 
     if not case_folder.exists() or not case_folder.is_dir():
         return None
 
+    search_folder = case_folder
+
+    if timepoint is not None:
+        search_folder = case_folder / str(timepoint)
+
+        if not search_folder.exists() or not search_folder.is_dir():
+            return None
+
     matches = sorted(
-        path for path in case_folder.glob(pattern)
+        path for path in search_folder.glob(pattern)
         if path.is_file()
     )
 
@@ -129,6 +137,9 @@ def clean_roi_masks_folder(
         exclusion_root=None,
         exclusion_dilation=1,
         suffix="_cleaned",
+        roi_timepoint=None,
+        allowed_timepoint=None,
+        exclusion_timepoint=None,
         overwrite_existing=False,
     ):
 
@@ -143,8 +154,8 @@ def clean_roi_masks_folder(
     for patient in patients:
 
         case_id = patient.name
-        roi_image_path = find_matching_mask(roi_root, case_id)
-        allowed_mask_path = find_matching_mask(allowed_root, case_id)
+        roi_image_path = find_matching_mask(roi_root, case_id, timepoint=roi_timepoint)
+        allowed_mask_path = find_matching_mask(allowed_root, case_id, timepoint=allowed_timepoint)
 
         if roi_image_path is None:
             print(f"[Warning] No ROI mask found for {case_id}. Skipping.")
@@ -155,7 +166,7 @@ def clean_roi_masks_folder(
             continue
 
         if exclusion_root is not None:
-            exclusion_mask_path = find_matching_mask(exclusion_root, case_id)
+            exclusion_mask_path = find_matching_mask(exclusion_root, case_id, timepoint=exclusion_timepoint)
             if exclusion_mask_path is None:
                 print(f"[Warning] No exclusion mask found for {case_id}. Skipping.")
                 continue

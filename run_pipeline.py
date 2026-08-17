@@ -140,6 +140,21 @@ def build_parser():
     )
 
     parser.add_argument(
+        "--roi-timepoint",
+        help="Optional nested timepoint folder for ROI masks, for example Pre or Post.",
+    )
+
+    parser.add_argument(
+        "--allowed-timepoint",
+        help="Optional nested timepoint folder for allowed masks, for example Pre or Post.",
+    )
+
+    parser.add_argument(
+        "--exclusion-timepoint",
+        help="Optional nested timepoint folder for exclusion masks, for example Pre or Post.",
+    )
+
+    parser.add_argument(
         "--exclusion-dilation",
         type=int,
         default=1,
@@ -195,7 +210,6 @@ def build_parser():
         action="store_true",
         help="Overwrite existing output files instead of skipping them.",
     )
-
 
     return parser
 
@@ -750,6 +764,9 @@ def main():
             exclusion_root=args.exclusion_root,
             exclusion_dilation=args.exclusion_dilation,
             suffix=args.suffix,
+            roi_timepoint=args.roi_timepoint,
+            allowed_timepoint=args.allowed_timepoint,
+            exclusion_timepoint=args.exclusion_timepoint,
             overwrite_existing=args.overwrite_existing,
         )
 
