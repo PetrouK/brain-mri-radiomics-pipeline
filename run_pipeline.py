@@ -361,6 +361,7 @@ def run_pipeline_steps(config,
                 list(timepoints_config.values()),
                 run_config["sequences"],
                 copy_files=copy_files,
+                overwrite_existing=overwrite_existing,
             )
             summary[step] = created_files
 
@@ -418,6 +419,7 @@ def run_pipeline_steps(config,
                 copy_files=copy_files,
                 pre_target_root=output_organized_pre,
                 post_target_root=output_organized_post,
+                overwrite_existing=overwrite_existing,
             )
 
             if not created_files:
@@ -579,6 +581,7 @@ def main():
             timepoints=list(run_config["timepoints"].values()),
             sequences=run_config["sequences"],
             copy_files=copy_files,
+            overwrite_existing=args.overwrite_existing,
         )
 
         print(f"Created {len(created_files)} files.")
@@ -602,6 +605,7 @@ def main():
             post_target_root=Path(args.output) / folders_config["organized_post"],
             pre_name=timepoints_config.get("pre", "Pre"),
             post_name=timepoints_config.get("post", "Post"),
+            overwrite_existing=args.overwrite_existing,
         )
 
         print(f"Created {len(created_files)} files.")
@@ -679,6 +683,28 @@ def main():
 
         print("Difference image complete.")
         print(result)
+        return
+
+    if args.command == "segment-pre-lesions":
+        from mri_pipeline.lesions.flames import segment_pre_lesions_folder
+
+        if not args.input:
+            parser.error("segment-pre-lesions requires --input")
+        if not args.output:
+            parser.error("segment-pre-lesions requires --output")
+
+        flames_config = config["run"]["flames"]
+        timepoints_config = config["run"]["timepoints"]
+
+        created_masks = segment_pre_lesions_folder(
+            preprocessed_root=args.input,
+            output_root=args.output,
+            pre_timepoint=timepoints_config.get("pre", "Pre"),
+            flames_root=flames_config.get("root"),
+            overwrite_existing=args.overwrite_existing,
+        )
+
+        print(f"Created {len(created_masks)} Pre lesion masks.")
         return
 
     if args.command == "segment-lesions":

@@ -28,10 +28,13 @@ def find_sequence_files(folder_path, sequence_name):
 
     return sorted(matched_files)
 
-def transfer_file(src, dst, copy_mode=True):
+def transfer_file(src, dst, copy_mode=True, overwrite_existing=False):
     src = Path(src)
     dst = Path(dst)
     ensure_dir(dst.parent)
+
+    if dst.exists() and not overwrite_existing:
+        return dst
 
     if copy_mode:
         shutil.copy2(src, dst)
@@ -46,6 +49,7 @@ def organize_mri_files(
     timepoints,
     sequences,
     copy_files=True,
+    overwrite_existing=False,
 ):
 
     input_root = Path(input_root)
@@ -98,9 +102,18 @@ def organize_mri_files(
 
                 for src_file in matched_files:
                     dst_file = destination_patient_folder / src_file.name
-                    created_file = transfer_file(src_file, dst_file, copy_mode=copy_files)
+                    destination_exists = dst_file.exists()
+                    created_file = transfer_file(
+                        src_file,
+                        dst_file,
+                        copy_mode=copy_files,
+                        overwrite_existing=overwrite_existing,
+                    )
                     created_files.append(created_file)
-                    print(f"    -> {'Copied' if copy_files else 'Moved'}: {src_file.name}")
+                    if destination_exists and not overwrite_existing:
+                        print(f"    -> Skipped existing: {src_file.name}")
+                    else:
+                        print(f"    -> {'Copied' if copy_files else 'Moved'}: {src_file.name}")
 
         print()
 

@@ -60,6 +60,7 @@ def organize_by_normalization(
     post_target_root=None,
     pre_name="Pre",
     post_name="Post",
+    overwrite_existing=False,
 ):
     source_root = Path(source_root)
     target_root = None if target_root is None else Path(target_root)
@@ -132,6 +133,7 @@ def organize_by_normalization(
                 file,
                 destination_file,
                 copy_mode=copy_files,
+                overwrite_existing=overwrite_existing,
             )
             created_files.append(created_file)
 
