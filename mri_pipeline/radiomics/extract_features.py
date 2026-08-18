@@ -175,6 +175,16 @@ def process_radiomics_case(case_jobs, discretization_mode, discretization_value)
         mask = sitk.ReadImage(str(mask_path), sitk.sitkUInt8)
         mask = make_binary_mask(mask)
         roi_range = compute_roi_intensity_range(image, mask)
+
+        if roi_range is None:
+            print(
+                "[Warning] Empty ROI mask. "
+                f"Case: {row['case_id']}, "
+                f"ROI: {row['roi_label']}, "
+                f"Image: {image_path.name}, "
+                f"Mask: {mask_path}. Skipping."
+            )
+            continue
         
         features = extractor.execute(image, mask, label=1)
     
