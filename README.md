@@ -222,6 +222,8 @@ Clean manual ROI masks, such as manually segmented new lesions:
 python run_pipeline.py clean-roi-masks --roi-root "/data/Manual_Lesions" --allowed-root "/data/Masks/White_Matter" --exclusion-root "/data/FLAMeS_Lesions/Existing_Pre" --output "/data/Cleaned_ROIs/Lesions"
 ```
 
+If a case folder contains multiple ROI masks, all masks are cleaned; each output keeps the original mask name plus the cleaning suffix.
+
 If the allowed, ROI, or exclusion masks are stored in nested `Pre`/`Post` folders, pass the corresponding timepoint. For example, to clean manually segmented Post/new lesion masks using Post white matter masks:
 
 ```bash
@@ -235,7 +237,15 @@ Use `--exclusion-dilation 0` to remove only overlapping voxels. Use `--exclusion
 Mirror ROI masks, for example to create healthy control ROIs from manually segmented lesion masks:
 
 ```bash
-python run_pipeline.py mirror-roi-masks --input "/data/Cleaned_ROIs/Lesions" --output "/data/Healthy"
+python run_pipeline.py mirror-roi-masks --input "/data/Manual_Lesions" --output "/data/Healthy"
+```
+
+If a case folder contains multiple ROI masks, all masks are mirrored. By default, mirrored outputs use the `_healthy` suffix.
+
+Clean the mirrored healthy control ROIs with the same white matter and exclusion masks:
+
+```bash
+python run_pipeline.py clean-roi-masks --roi-root "/data/Healthy" --allowed-root "/data/Masks/White_Matter" --allowed-timepoint Post --exclusion-root "/data/FLAMeS_Lesions/Existing_Pre" --output "/data/Cleaned_ROIs/Healthy"
 ```
 
 Extract radiomics features:

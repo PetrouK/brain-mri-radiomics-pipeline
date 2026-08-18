@@ -109,11 +109,21 @@ def clean_roi_mask_file(
     return output_path
 
 def find_matching_mask(mask_root, case_id, pattern="*.nii*", timepoint=None):
+    matches = find_matching_masks(
+        mask_root=mask_root,
+        case_id=case_id,
+        pattern=pattern,
+        timepoint=timepoint,
+    )
+
+    return matches[0] if matches else None
+
+def find_matching_masks(mask_root, case_id, pattern="*.nii*", timepoint=None):
     mask_root = Path(mask_root)
     case_folder = mask_root / str(case_id)
 
     if not case_folder.exists() or not case_folder.is_dir():
-        return None
+        return []
 
     search_folder = case_folder
 
@@ -121,14 +131,14 @@ def find_matching_mask(mask_root, case_id, pattern="*.nii*", timepoint=None):
         search_folder = case_folder / str(timepoint)
 
         if not search_folder.exists() or not search_folder.is_dir():
-            return None
+            return []
 
     matches = sorted(
         path for path in search_folder.glob(pattern)
         if path.is_file()
     )
 
-    return matches[0] if matches else None
+    return matches
 
 def clean_roi_masks_folder(
         roi_root,
@@ -154,10 +164,10 @@ def clean_roi_masks_folder(
     for patient in patients:
 
         case_id = patient.name
-        roi_image_path = find_matching_mask(roi_root, case_id, timepoint=roi_timepoint)
+        roi_image_paths = find_matching_masks(roi_root, case_id, timepoint=roi_timepoint)
         allowed_mask_path = find_matching_mask(allowed_root, case_id, timepoint=allowed_timepoint)
 
-        if roi_image_path is None:
+        if not roi_image_paths:
             print(f"[Warning] No ROI mask found for {case_id}. Skipping.")
             continue
 
@@ -174,16 +184,17 @@ def clean_roi_masks_folder(
             exclusion_mask_path = None
 
         case_output_root = output_root / case_id
-        output_path = clean_roi_mask_file(
-            roi_mask_path=roi_image_path,
-            allowed_mask_path=allowed_mask_path,
-            output_root=case_output_root,
-            exclusion_mask_path=exclusion_mask_path,
-            exclusion_dilation=exclusion_dilation,
-            suffix=suffix,
-            overwrite_existing=overwrite_existing,
-        )
-        created_files.append(output_path)
+        for roi_image_path in roi_image_paths:
+            output_path = clean_roi_mask_file(
+                roi_mask_path=roi_image_path,
+                allowed_mask_path=allowed_mask_path,
+                output_root=case_output_root,
+                exclusion_mask_path=exclusion_mask_path,
+                exclusion_dilation=exclusion_dilation,
+                suffix=suffix,
+                overwrite_existing=overwrite_existing,
+            )
+            created_files.append(output_path)
 
     return created_files
 

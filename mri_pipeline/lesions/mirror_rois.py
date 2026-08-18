@@ -3,7 +3,7 @@ from pathlib import Path
 import SimpleITK as sitk
 
 from mri_pipeline.utils.files import ensure_dir, build_output_path, get_patient_dirs
-from mri_pipeline.lesions.mask_cleaning import find_matching_mask
+from mri_pipeline.lesions.mask_cleaning import find_matching_masks
 
 def mirror_mask_left_right(input_path, output_path, axis=2):
     """
@@ -57,14 +57,21 @@ def mirror_roi_masks_folder(roi_root, output_root, suffix="_mirrored", axis=2, o
 
     for patient in patients:
         case_id = patient.name
-        input_mask_path = find_matching_mask(roi_root, case_id)
-        if input_mask_path is None:
+        input_mask_paths = find_matching_masks(roi_root, case_id)
+        if not input_mask_paths:
             print(f"[Warning] No ROI mask found for {case_id}. Skipping.")
             continue
 
         case_output_root = output_root / case_id
-        created_mask = mirror_mask_file(input_mask_path, case_output_root, suffix, axis, overwrite_existing)
-        created_files.append(created_mask)
+        for input_mask_path in input_mask_paths:
+            created_mask = mirror_mask_file(
+                input_mask_path,
+                case_output_root,
+                suffix,
+                axis,
+                overwrite_existing,
+            )
+            created_files.append(created_mask)
 
     return created_files
 

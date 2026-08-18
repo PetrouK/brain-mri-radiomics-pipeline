@@ -163,8 +163,8 @@ def build_parser():
 
     parser.add_argument(
         "--suffix",
-        default="_cleaned",
-        help="Suffix added to cleaned ROI mask filenames.",
+        default=None,
+        help="Suffix added to output ROI mask filenames.",
     )
 
     parser.add_argument(
@@ -789,7 +789,7 @@ def main():
             output_root=args.output,
             exclusion_root=args.exclusion_root,
             exclusion_dilation=args.exclusion_dilation,
-            suffix=args.suffix,
+            suffix=args.suffix or "_cleaned",
             roi_timepoint=args.roi_timepoint,
             allowed_timepoint=args.allowed_timepoint,
             exclusion_timepoint=args.exclusion_timepoint,
@@ -810,7 +810,7 @@ def main():
         created_files = mirror_roi_masks(
             input_path=args.input,
             output_root=args.output,
-            suffix=args.suffix,
+            suffix=args.suffix or "_healthy",
             axis=args.mirror_axis,
             overwrite_existing=args.overwrite_existing,
         )
