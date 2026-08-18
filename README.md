@@ -186,10 +186,22 @@ Segment Pre/existing lesions with FLAMeS:
 python run_pipeline.py segment-pre-lesions --input "/data/Preprocessed_FLAIR" --output "/data/Output"
 ```
 
-Segment lesions with FLAMeS into a custom output folder:
+This writes masks under:
+
+```text
+/data/Output/FLAMeS_Lesions/Existing_Pre/
+```
+
+Segment lesions with FLAMeS into another named FLAMeS lesion folder:
 
 ```bash
-python run_pipeline.py segment-lesions --input "/data/Post_FLAIR_brain" --output "/data/Output" --lesion-folder "Post_FLAMeS"
+python run_pipeline.py segment-lesions --input "/data/Post_FLAIR_brain" --output "/data/Output" --lesion-folder "Post"
+```
+
+This writes masks under:
+
+```text
+/data/Output/FLAMeS_Lesions/Post/
 ```
 
 Generate white matter masks with SynthSeg:
@@ -207,13 +219,13 @@ python run_pipeline.py run --input "/data/Preprocessed_FLAIR" --output "/data/Ou
 Clean manual ROI masks, such as manually segmented new lesions:
 
 ```bash
-python run_pipeline.py clean-roi-masks --roi-root "/data/Lesions/New_Manual" --allowed-root "/data/Masks/White_Matter" --exclusion-root "/data/Lesions/Existing_Pre" --output "/data/Lesions/New_Cleaned"
+python run_pipeline.py clean-roi-masks --roi-root "/data/Manual_Lesions" --allowed-root "/data/Masks/White_Matter" --exclusion-root "/data/FLAMeS_Lesions/Existing_Pre" --output "/data/Cleaned_ROIs/Lesions"
 ```
 
 If the allowed, ROI, or exclusion masks are stored in nested `Pre`/`Post` folders, pass the corresponding timepoint. For example, to clean manually segmented Post/new lesion masks using Post white matter masks:
 
 ```bash
-python run_pipeline.py clean-roi-masks --roi-root "/data/Masks/Lesions" --allowed-root "/data/Masks/White_Matter" --allowed-timepoint Post --exclusion-root "/data/Masks/Presegmented_maps/Lesions/Existing_Pre" --output "/data/Masks/Lesions_Cleaned"
+python run_pipeline.py clean-roi-masks --roi-root "/data/Manual_Lesions" --allowed-root "/data/Masks/White_Matter" --allowed-timepoint Post --exclusion-root "/data/FLAMeS_Lesions/Existing_Pre" --output "/data/Cleaned_ROIs/Lesions"
 ```
 
 The same command can use Pre white matter masks by changing `--allowed-timepoint Post` to `--allowed-timepoint Pre`. If the folders are not nested by timepoint, omit the timepoint arguments.
@@ -223,7 +235,7 @@ Use `--exclusion-dilation 0` to remove only overlapping voxels. Use `--exclusion
 Mirror ROI masks, for example to create healthy control ROIs from manually segmented lesion masks:
 
 ```bash
-python run_pipeline.py mirror-roi-masks --input "/data/Lesions/New_Cleaned" --output "/data/ROIs/Healthy"
+python run_pipeline.py mirror-roi-masks --input "/data/Cleaned_ROIs/Lesions" --output "/data/Healthy"
 ```
 
 Extract radiomics features:
@@ -360,11 +372,13 @@ Typical output:
 Output/
   Preprocessed_FLAIR/
   Difference_Images/
-  Lesions/
+  Manual_Lesions/
+  FLAMeS_Lesions/
     Existing_Pre/
-    Post_FLAMeS/
-    New_Cleaned/
-  ROIs/
+    Post/
+  Healthy/
+  Cleaned_ROIs/
+    Lesions/
     Healthy/
   Masks/
     White_Matter/

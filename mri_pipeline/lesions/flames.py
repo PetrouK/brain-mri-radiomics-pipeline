@@ -125,7 +125,7 @@ def segment_lesions_file(
     staging_input = output_root / "FLAMeS_Work" / "input"
     staging_output = output_root / "FLAMeS_Work" / "output"
 
-    final_output_root = output_root / "Lesions" / lesion_folder
+    final_output_root = output_root / "FLAMeS_Lesions" / lesion_folder
 
     if case_folder_name is not None:
         final_output_root = final_output_root / str(case_folder_name)

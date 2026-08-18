@@ -80,7 +80,7 @@ def build_parser():
     parser.add_argument(
         "--lesion-folder",
         default="Existing_Pre",
-        help="Output folder name under Lesions for FLAMeS lesion masks.",
+        help="Output folder name under FLAMeS_Lesions for FLAMeS lesion masks.",
     )
 
     parser.add_argument(
