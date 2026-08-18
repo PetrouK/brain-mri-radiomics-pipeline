@@ -2,7 +2,7 @@ from pathlib import Path
 
 import SimpleITK as sitk
 
-from mri_pipeline.utils.files import ensure_dir, build_output_path, get_patient_dirs
+from mri_pipeline.utils.files import ensure_dir, get_patient_dirs, strip_nifti_extension
 from mri_pipeline.lesions.mask_cleaning import find_matching_masks
 
 def mirror_mask_left_right(input_path, output_path, axis=2):
@@ -30,11 +30,40 @@ def mirror_mask_left_right(input_path, output_path, axis=2):
     return output_path
 
 
+def get_nifti_extension(path):
+    name = Path(path).name.lower()
+
+    if name.endswith(".nii.gz"):
+        return ".nii.gz"
+
+    if name.endswith(".nii"):
+        return ".nii"
+
+    return Path(path).suffix
+
+
+def build_healthy_mask_name(input_mask_path, suffix="_healthy"):
+    stem = strip_nifti_extension(input_mask_path)
+    extension = get_nifti_extension(input_mask_path)
+
+    if "Segmentation" in stem:
+        return f"{stem.replace('Segmentation', 'Healthy')}{extension}"
+
+    if "segmentation" in stem:
+        return f"{stem.replace('segmentation', 'Healthy')}{extension}"
+
+    if "SEGMENTATION" in stem:
+        return f"{stem.replace('SEGMENTATION', 'Healthy')}{extension}"
+
+    return f"{stem}{suffix}{extension}"
+
+
 def build_mirrored_mask_path(input_mask_path, output_root, suffix="_mirrored"):
     input_mask_path = Path(input_mask_path)
     output_root = Path(output_root)
 
-    output_path = build_output_path(input_path=input_mask_path, output_dir=output_root, suffix=suffix)
+    output_filename = build_healthy_mask_name(input_mask_path, suffix=suffix)
+    output_path = output_root / output_filename
 
     return output_path
 
