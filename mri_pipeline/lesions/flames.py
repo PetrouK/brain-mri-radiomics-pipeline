@@ -122,8 +122,9 @@ def segment_lesions_file(
     image_path = Path(image_path)
     output_root = Path(output_root)
     
-    staging_input = output_root / "FLAMeS_Work" / "input"
-    staging_output = output_root / "FLAMeS_Work" / "output"
+    flames_work_root = output_root / "FLAMeS_Work"
+    staging_input = flames_work_root / "input"
+    staging_output = flames_work_root / "output"
 
     final_output_root = output_root / "FLAMeS_Lesions" / lesion_folder
 
@@ -144,8 +145,7 @@ def segment_lesions_file(
 
     mask_path = get_flames_output_mask(staging_output, image_path)
     final_mask_path = copy_flames_segmap(mask_path, final_output_root, image_path)
-    shutil.rmtree(staging_input, ignore_errors=True)
-    shutil.rmtree(staging_output, ignore_errors=True)
+    shutil.rmtree(flames_work_root, ignore_errors=True)
 
     return final_mask_path
 
