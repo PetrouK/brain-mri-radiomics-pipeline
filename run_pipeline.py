@@ -22,6 +22,7 @@ RUN_STEPS = [
     "segment-lesions",
     "segment-white-matter",
     "segment-csf",
+    "segment-ventricles",
 ]
 
 PREPROCESS_STEPS = [
@@ -42,11 +43,11 @@ def build_parser():
             "split-normalizations",
             "preprocess-flair",
             "make-diff-images",
-            "make-synthseg-masks",
             "segment-pre-lesions",
             "segment-lesions",
             "segment-white-matter",
             "segment-csf",
+            "segment-ventricles",
             "clean-roi-masks",
             "mirror-roi-masks",
             "extract-radiomics",
@@ -133,12 +134,14 @@ def build_parser():
 
     parser.add_argument(
         "--allowed-root",
-        help="Folder with allowed masks, for example white matter masks, organized by case/patient.",
+        nargs="+",
+        help="One or more folders with allowed masks, for example white matter masks, organized by case/patient.",
     )
 
     parser.add_argument(
         "--forbidden-root",
-        help="Optional folder with forbidden masks, for example CSF masks, organized by case/patient.",
+        nargs="+",
+        help="Optional one or more folders with forbidden masks, for example CSF or ventricle masks, organized by case/patient.",
     )
 
     parser.add_argument(
@@ -537,6 +540,33 @@ def run_pipeline_steps(config,
 
             summary[step] = created_masks
 
+        if step == "segment-ventricles":
+            from mri_pipeline.preprocessing.synthseg_masks import create_ventricles_masks
+
+            if "preprocess-flair" in summary:
+                ventricles_input = output_preprocessed
+                ventricles_registered_only = True
+            else:
+                ventricles_input = input_root
+                ventricles_registered_only = registered_only
+
+            synthseg_config = config["run"]["synthseg"]
+
+            created_masks = create_ventricles_masks(
+                input_root=ventricles_input,
+                output_root=output_root,
+                synthseg_work_root=output_root / "SynthSeg_Work",
+                python_executable=synthseg_config.get("python_executable", "python"),
+                script_path=synthseg_config["script_path"],
+                keepgeom=synthseg_config.get("keepgeom", True),
+                version=synthseg_config.get("version", "auto"),
+                keep_intermediate=synthseg_config.get("keep_intermediate", False),
+                registered_only=ventricles_registered_only,
+                overwrite_existing=overwrite_existing,
+            )
+
+            summary[step] = created_masks
+
         if step == "segment-lesions":
             from mri_pipeline.lesions.flames import segment_lesions_folder
 
@@ -821,22 +851,31 @@ def main():
         print(f"Created {len(created_masks)} CSF masks.")
         return
 
-    if args.command == "make-synthseg-masks":
-        from mri_pipeline.preprocessing.synthseg_masks import create_synthseg_masks
+    if args.command == "segment-ventricles":
+        from mri_pipeline.preprocessing.synthseg_masks import create_ventricles_masks
 
-        synthseg_config = config["synthseg_masks"]
+        if not args.input:
+            parser.error("segment-ventricles requires --input")
+        if not args.output:
+            parser.error("segment-ventricles requires --output")
 
-        created_files = create_synthseg_masks(
-            input_root=synthseg_config["input_root"],
-            synthseg_root=synthseg_config.get("synthseg_root", config["synthseg_root"]),
-            output_roots=synthseg_config["output_roots"],
-            regions=synthseg_config.get("regions"),
-            patterns=synthseg_config.get("patterns"),
-            docker_image=synthseg_config.get("docker_image", "freesurfer/freesurfer:8.2.0"),
-            use_gpu=synthseg_config.get("use_gpu", True),
+        synthseg_config = config["run"]["synthseg"]
+        output_root = Path(args.output)
+
+        created_masks = create_ventricles_masks(
+            input_root=args.input,
+            output_root=output_root,
+            synthseg_work_root=output_root / "SynthSeg_Work",
+            python_executable=synthseg_config.get("python_executable", "python"),
+            script_path=synthseg_config["script_path"],
+            keepgeom=synthseg_config.get("keepgeom", True),
+            version=synthseg_config.get("version", "auto"),
+            keep_intermediate=synthseg_config.get("keep_intermediate", False),
+            registered_only=args.registered_only,
+            overwrite_existing=args.overwrite_existing,
         )
 
-        print(f"Created {len(created_files)} SynthSeg masks.")
+        print(f"Created {len(created_masks)} ventricle masks.")
         return
 
     if args.command == "clean-roi-masks":
@@ -851,10 +890,10 @@ def main():
 
         created_files = clean_roi_masks_folder(
             roi_root=args.roi_root,
-            allowed_root=args.allowed_root,
+            allowed_roots=args.allowed_root,
             output_root=args.output,
             exclusion_root=args.exclusion_root,
-            forbidden_root=args.forbidden_root,
+            forbidden_roots=args.forbidden_root,
             exclusion_dilation=args.exclusion_dilation,
             suffix=args.suffix or "_cleaned",
             roi_timepoint=args.roi_timepoint,

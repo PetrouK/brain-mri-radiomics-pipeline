@@ -12,7 +12,7 @@ Research use only. This is not a clinical diagnostic tool. The workflow has been
 - Preprocess FLAIR images with N4, registration, skull stripping, and normalization.
 - Save and reuse registration transforms.
 - Create histogram-matched Pre/Post difference images.
-- Generate white matter masks with SynthSeg.
+- Generate white matter, CSF, and ventricular masks with SynthSeg.
 - Generate lesion masks with FLAMeS.
 - Mirror manual lesion ROIs to create healthy control ROIs.
 - Clean lesion and healthy ROIs using white matter and exclusion masks.
@@ -96,6 +96,14 @@ Output/
       Patient_ID/
         Pre/
         Post/
+    CSF/
+      Patient_ID/
+        Pre/
+        Post/
+    Ventricles/
+      Patient_ID/
+        Pre/
+        Post/
 
   Healthy/
     Patient_ID/
@@ -119,10 +127,12 @@ Run preprocessing, difference images, and organization:
 python run_pipeline.py run --config "config.local.yaml" --input "/data/Input" --output "/data/Output" --steps split-sequences preprocess-flair make-diff-images split-normalizations --preprocess-steps n4 registration skull-strip diff normalization
 ```
 
-Generate white matter masks:
+Generate SynthSeg masks:
 
 ```bash
 python run_pipeline.py segment-white-matter --config "config.local.yaml" --input "/data/Output/Preprocessed_FLAIR" --output "/data/Output" --registered-only
+python run_pipeline.py segment-csf --config "config.local.yaml" --input "/data/Output/Preprocessed_FLAIR" --output "/data/Output" --registered-only
+python run_pipeline.py segment-ventricles --config "config.local.yaml" --input "/data/Output/Preprocessed_FLAIR" --output "/data/Output" --registered-only
 ```
 
 Organize normalized outputs without overwriting existing files:
@@ -150,10 +160,22 @@ The mirror step renames `Segmentation` to `Healthy`, for example:
 Patient_ID_Segmentation_1.nii -> Patient_ID_Healthy_1.nii
 ```
 
-Clean manual lesion ROIs:
+Clean manual lesion ROIs inside white matter and away from existing Pre lesions:
 
 ```bash
 python run_pipeline.py clean-roi-masks --roi-root "/data/Output/Lesions" --allowed-root "/data/Output/Masks/White_Matter" --allowed-timepoint Post --exclusion-root "/data/Output/FLAMeS_Lesions/Existing_Pre" --output "/data/Output/Cleaned_ROIs/Lesions"
+```
+
+Clean manual lesion ROIs inside white matter, outside CSF/ventricles, and away from existing Pre lesions:
+
+```bash
+python run_pipeline.py clean-roi-masks --roi-root "/data/Output/Lesions" --allowed-root "/data/Output/Masks/White_Matter" --allowed-timepoint Post --forbidden-root "/data/Output/Masks/CSF" "/data/Output/Masks/Ventricles" --forbidden-timepoint Post --exclusion-root "/data/Output/FLAMeS_Lesions/Existing_Pre" --output "/data/Output/Cleaned_ROIs/Lesions"
+```
+
+Clean manual lesion ROIs outside CSF/ventricles and away from existing Pre lesions, without requiring white matter:
+
+```bash
+python run_pipeline.py clean-roi-masks --roi-root "/data/Output/Lesions" --forbidden-root "/data/Output/Masks/CSF" "/data/Output/Masks/Ventricles" --forbidden-timepoint Post --exclusion-root "/data/Output/FLAMeS_Lesions/Existing_Pre" --output "/data/Output/Cleaned_ROIs/Lesions"
 ```
 
 Clean healthy ROIs:

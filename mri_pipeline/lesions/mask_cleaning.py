@@ -49,8 +49,8 @@ def dilate_mask(mask_image, radius=1):
 def clean_roi_mask(
         roi_mask_path,
         output_path,
-        allowed_mask_path=None,
-        forbidden_mask_path=None,
+        allowed_mask_paths=None,
+        forbidden_mask_paths=None,
         exclusion_mask_path=None,
         exclusion_dilation=1,
     ):
@@ -59,13 +59,15 @@ def clean_roi_mask(
 
     roi = read_binary_mask(roi_mask_path)
     cleaned = roi
+    allowed_mask_paths = allowed_mask_paths or []
+    forbidden_mask_paths = forbidden_mask_paths or []
 
-    if allowed_mask_path is not None:
+    for allowed_mask_path in allowed_mask_paths:
         allowed = read_binary_mask(allowed_mask_path)
         check_same_geometry(roi, allowed, "allowed mask")
         cleaned = cleaned & allowed
 
-    if forbidden_mask_path is not None:
+    for forbidden_mask_path in forbidden_mask_paths:
         forbidden = read_binary_mask(forbidden_mask_path)
         check_same_geometry(roi, forbidden, "forbidden mask")
         cleaned = cleaned & (forbidden == 0)
@@ -96,8 +98,8 @@ def build_cleaned_mask_path(output_root, roi_mask_path, suffix="_cleaned"):
 def clean_roi_mask_file(
         roi_mask_path,
         output_root,
-        allowed_mask_path=None,
-        forbidden_mask_path=None,
+        allowed_mask_paths=None,
+        forbidden_mask_paths=None,
         exclusion_mask_path=None,
         exclusion_dilation=1,
         suffix="_cleaned",
@@ -105,8 +107,8 @@ def clean_roi_mask_file(
     ):
 
     roi_mask_path = Path(roi_mask_path)
-    allowed_mask_path = Path(allowed_mask_path) if allowed_mask_path is not None else None
-    forbidden_mask_path = Path(forbidden_mask_path) if forbidden_mask_path is not None else None
+    allowed_mask_paths = [Path(path) for path in allowed_mask_paths] if allowed_mask_paths is not None else []
+    forbidden_mask_paths = [Path(path) for path in forbidden_mask_paths] if forbidden_mask_paths is not None else []
     exclusion_mask_path = Path(exclusion_mask_path) if exclusion_mask_path is not None else None
 
     output_path = build_cleaned_mask_path(output_root, roi_mask_path, suffix)
@@ -117,8 +119,8 @@ def clean_roi_mask_file(
 
     output_path = clean_roi_mask(
         roi_mask_path=roi_mask_path,
-        allowed_mask_path=allowed_mask_path,
-        forbidden_mask_path=forbidden_mask_path,
+        allowed_mask_paths=allowed_mask_paths,
+        forbidden_mask_paths=forbidden_mask_paths,
         output_path=output_path,
         exclusion_mask_path=exclusion_mask_path,
         exclusion_dilation=exclusion_dilation,
@@ -160,8 +162,8 @@ def find_matching_masks(mask_root, case_id, pattern="*.nii*", timepoint=None):
 def clean_roi_masks_folder(
         roi_root,
         output_root,
-        allowed_root=None,
-        forbidden_root=None,
+        allowed_roots=None,
+        forbidden_roots=None,
         exclusion_root=None,
         exclusion_dilation=1,
         suffix="_cleaned",
@@ -174,11 +176,11 @@ def clean_roi_masks_folder(
 
     roi_root = Path(roi_root)
     output_root = Path(output_root)
-    allowed_root = Path(allowed_root) if allowed_root is not None else None
-    forbidden_root = Path(forbidden_root) if forbidden_root is not None else None
+    allowed_roots = [Path(root) for root in allowed_roots] if allowed_roots is not None else []
+    forbidden_roots = [Path(root) for root in forbidden_roots] if forbidden_roots is not None else []
     exclusion_root = Path(exclusion_root) if exclusion_root is not None else None
 
-    if allowed_root is None and forbidden_root is None and exclusion_root is None:
+    if not allowed_roots and not forbidden_roots and exclusion_root is None:
         raise ValueError(
             "At least one of allowed_root, forbidden_root, or exclusion_root is required for ROI cleaning."
         )
@@ -195,21 +197,29 @@ def clean_roi_masks_folder(
             print(f"[Warning] No ROI mask found for {case_id}. Skipping.")
             continue
 
-        if allowed_root is not None:
+        allowed_mask_paths = []
+        for allowed_root in allowed_roots:
             allowed_mask_path = find_matching_mask(allowed_root, case_id, timepoint=allowed_timepoint)
             if allowed_mask_path is None:
-                print(f"[Warning] No allowed mask found for {case_id}. Skipping.")
-                continue
-        else:
-            allowed_mask_path = None
+                print(f"[Warning] No allowed mask found for {case_id} in {allowed_root}. Skipping.")
+                allowed_mask_paths = None
+                break
+            allowed_mask_paths.append(allowed_mask_path)
 
-        if forbidden_root is not None:
+        if allowed_mask_paths is None:
+            continue
+
+        forbidden_mask_paths = []
+        for forbidden_root in forbidden_roots:
             forbidden_mask_path = find_matching_mask(forbidden_root, case_id, timepoint=forbidden_timepoint)
             if forbidden_mask_path is None:
-                print(f"[Warning] No forbidden mask found for {case_id}. Skipping.")
-                continue
-        else:
-            forbidden_mask_path = None
+                print(f"[Warning] No forbidden mask found for {case_id} in {forbidden_root}. Skipping.")
+                forbidden_mask_paths = None
+                break
+            forbidden_mask_paths.append(forbidden_mask_path)
+
+        if forbidden_mask_paths is None:
+            continue
 
         if exclusion_root is not None:
             exclusion_mask_path = find_matching_mask(exclusion_root, case_id, timepoint=exclusion_timepoint)
@@ -223,8 +233,8 @@ def clean_roi_masks_folder(
         for roi_image_path in roi_image_paths:
             output_path = clean_roi_mask_file(
                 roi_mask_path=roi_image_path,
-                allowed_mask_path=allowed_mask_path,
-                forbidden_mask_path=forbidden_mask_path,
+                allowed_mask_paths=allowed_mask_paths,
+                forbidden_mask_paths=forbidden_mask_paths,
                 output_root=case_output_root,
                 exclusion_mask_path=exclusion_mask_path,
                 exclusion_dilation=exclusion_dilation,
