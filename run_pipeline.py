@@ -21,6 +21,7 @@ RUN_STEPS = [
     "segment-pre-lesions",
     "segment-lesions",
     "segment-white-matter",
+    "segment-csf",
 ]
 
 PREPROCESS_STEPS = [
@@ -45,6 +46,7 @@ def build_parser():
             "segment-pre-lesions",
             "segment-lesions",
             "segment-white-matter",
+            "segment-csf",
             "clean-roi-masks",
             "mirror-roi-masks",
             "extract-radiomics",
@@ -135,6 +137,11 @@ def build_parser():
     )
 
     parser.add_argument(
+        "--forbidden-root",
+        help="Optional folder with forbidden masks, for example CSF masks, organized by case/patient.",
+    )
+
+    parser.add_argument(
         "--exclusion-root",
         help="Optional folder with exclusion masks, organized by case/patient.",
     )
@@ -147,6 +154,11 @@ def build_parser():
     parser.add_argument(
         "--allowed-timepoint",
         help="Optional nested timepoint folder for allowed masks, for example Pre or Post.",
+    )
+
+    parser.add_argument(
+        "--forbidden-timepoint",
+        help="Optional nested timepoint folder for forbidden masks, for example Pre or Post.",
     )
 
     parser.add_argument(
@@ -498,6 +510,33 @@ def run_pipeline_steps(config,
 
             summary[step] = created_masks
 
+        if step == "segment-csf":
+            from mri_pipeline.preprocessing.synthseg_masks import create_csf_masks
+
+            if "preprocess-flair" in summary:
+                csf_input = output_preprocessed
+                csf_registered_only = True
+            else:
+                csf_input = input_root
+                csf_registered_only = registered_only
+
+            synthseg_config = config["run"]["synthseg"]
+
+            created_masks = create_csf_masks(
+                input_root=csf_input,
+                output_root=output_root,
+                synthseg_work_root=output_root / "SynthSeg_Work",
+                python_executable=synthseg_config.get("python_executable", "python"),
+                script_path=synthseg_config["script_path"],
+                keepgeom=synthseg_config.get("keepgeom", True),
+                version=synthseg_config.get("version", "auto"),
+                keep_intermediate=synthseg_config.get("keep_intermediate", False),
+                registered_only=csf_registered_only,
+                overwrite_existing=overwrite_existing,
+            )
+
+            summary[step] = created_masks
+
         if step == "segment-lesions":
             from mri_pipeline.lesions.flames import segment_lesions_folder
 
@@ -755,6 +794,33 @@ def main():
         print(f"Created {len(created_masks)} white matter masks.")
         return
 
+    if args.command == "segment-csf":
+        from mri_pipeline.preprocessing.synthseg_masks import create_csf_masks
+
+        if not args.input:
+            parser.error("segment-csf requires --input")
+        if not args.output:
+            parser.error("segment-csf requires --output")
+
+        synthseg_config = config["run"]["synthseg"]
+        output_root = Path(args.output)
+
+        created_masks = create_csf_masks(
+            input_root=args.input,
+            output_root=output_root,
+            synthseg_work_root=output_root / "SynthSeg_Work",
+            python_executable=synthseg_config.get("python_executable", "python"),
+            script_path=synthseg_config["script_path"],
+            keepgeom=synthseg_config.get("keepgeom", True),
+            version=synthseg_config.get("version", "auto"),
+            keep_intermediate=synthseg_config.get("keep_intermediate", False),
+            registered_only=args.registered_only,
+            overwrite_existing=args.overwrite_existing,
+        )
+
+        print(f"Created {len(created_masks)} CSF masks.")
+        return
+
     if args.command == "make-synthseg-masks":
         from mri_pipeline.preprocessing.synthseg_masks import create_synthseg_masks
 
@@ -778,8 +844,8 @@ def main():
 
         if not args.roi_root:
             parser.error("clean-roi-masks requires --roi-root")
-        if not args.allowed_root:
-            parser.error("clean-roi-masks requires --allowed-root")
+        if not args.allowed_root and not args.forbidden_root and not args.exclusion_root:
+            parser.error("clean-roi-masks requires at least one of --allowed-root, --forbidden-root, or --exclusion-root")
         if not args.output:
             parser.error("clean-roi-masks requires --output")
 
@@ -788,10 +854,12 @@ def main():
             allowed_root=args.allowed_root,
             output_root=args.output,
             exclusion_root=args.exclusion_root,
+            forbidden_root=args.forbidden_root,
             exclusion_dilation=args.exclusion_dilation,
             suffix=args.suffix or "_cleaned",
             roi_timepoint=args.roi_timepoint,
             allowed_timepoint=args.allowed_timepoint,
+            forbidden_timepoint=args.forbidden_timepoint,
             exclusion_timepoint=args.exclusion_timepoint,
             overwrite_existing=args.overwrite_existing,
         )

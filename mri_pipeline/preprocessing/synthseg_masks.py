@@ -469,7 +469,7 @@ def create_white_matter_masks(
         registered_only=False,
         overwrite_existing=False,
     ):
-    
+
     input_root = Path(input_root)
     output_root = Path(output_root)
 
@@ -481,6 +481,49 @@ def create_white_matter_masks(
         synthseg_root=synthseg_work_root,
         output_roots={"white-matter": wm_output_root},
         regions=["white-matter"],
+        patterns=None,
+        python_executable=python_executable,
+        script_path=script_path,
+        keepgeom=keepgeom,
+        v1=v1,
+        version=version,
+        resample_to_input=resample_to_input,
+        registered_only=registered_only,
+        timepoint_names=("Pre", "Post"),
+        overwrite_existing=overwrite_existing,
+    )
+
+    if not keep_intermediate:
+        shutil.rmtree(synthseg_work_root, ignore_errors=True)
+
+    return created_files
+
+def create_csf_masks(
+        input_root,
+        output_root,
+        synthseg_work_root,
+        python_executable="python",
+        script_path=None,
+        keepgeom=True,
+        v1=False,
+        version="auto",
+        resample_to_input=True,
+        keep_intermediate=False,
+        registered_only=False,
+        overwrite_existing=False,
+    ):
+
+    input_root = Path(input_root)
+    output_root = Path(output_root)
+
+    output_root = ensure_dir(output_root)
+    csf_output_root = ensure_dir(output_root / "Masks" / "CSF")
+
+    created_files = create_synthseg_masks(
+        input_root=input_root,
+        synthseg_root=synthseg_work_root,
+        output_roots={"csf": csf_output_root},
+        regions=["csf"],
         patterns=None,
         python_executable=python_executable,
         script_path=script_path,

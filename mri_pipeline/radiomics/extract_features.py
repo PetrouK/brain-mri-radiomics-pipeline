@@ -5,6 +5,12 @@ import pandas as pd
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from mri_pipeline.utils.files import ensure_dir, get_patient_dirs, list_nifti_files
+import logging
+
+
+logger = logging.getLogger("radiomics")
+logger.setLevel(logging.ERROR)
+
 
 IGNORED_ROI_LABEL_FOLDERS = {"radiomics"}
 
@@ -186,7 +192,18 @@ def process_radiomics_case(case_jobs, discretization_mode, discretization_value)
             )
             continue
         
-        features = extractor.execute(image, mask, label=1)
+        try:
+            features = extractor.execute(image, mask, label=1)
+        except ValueError as error:
+            print(
+                "[Warning] Radiomics skipped ROI mask. "
+                f"Case: {row['case_id']}, "
+                f"ROI: {row['roi_label']}, "
+                f"Image: {image_path.name}, "
+                f"Mask: {mask_path}, "
+                f"Reason: {error}"
+            )
+            continue
     
         result = {
             "Case_ID": row["case_id"],

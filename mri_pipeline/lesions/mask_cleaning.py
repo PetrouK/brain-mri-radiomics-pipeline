@@ -46,15 +46,29 @@ def dilate_mask(mask_image, radius=1):
 
     return dilated
 
-def clean_roi_mask(roi_mask_path, allowed_mask_path, output_path, exclusion_mask_path=None, exclusion_dilation=1):
+def clean_roi_mask(
+        roi_mask_path,
+        output_path,
+        allowed_mask_path=None,
+        forbidden_mask_path=None,
+        exclusion_mask_path=None,
+        exclusion_dilation=1,
+    ):
+
     output_path = Path(output_path)
 
     roi = read_binary_mask(roi_mask_path)
-    allowed = read_binary_mask(allowed_mask_path)
+    cleaned = roi
 
-    check_same_geometry(roi, allowed, "allowed mask")
+    if allowed_mask_path is not None:
+        allowed = read_binary_mask(allowed_mask_path)
+        check_same_geometry(roi, allowed, "allowed mask")
+        cleaned = cleaned & allowed
 
-    cleaned = roi & allowed
+    if forbidden_mask_path is not None:
+        forbidden = read_binary_mask(forbidden_mask_path)
+        check_same_geometry(roi, forbidden, "forbidden mask")
+        cleaned = cleaned & (forbidden == 0)
 
     if exclusion_mask_path is not None:
         exclusion = read_binary_mask(exclusion_mask_path)
@@ -81,8 +95,9 @@ def build_cleaned_mask_path(output_root, roi_mask_path, suffix="_cleaned"):
 
 def clean_roi_mask_file(
         roi_mask_path,
-        allowed_mask_path,
         output_root,
+        allowed_mask_path=None,
+        forbidden_mask_path=None,
         exclusion_mask_path=None,
         exclusion_dilation=1,
         suffix="_cleaned",
@@ -90,8 +105,9 @@ def clean_roi_mask_file(
     ):
 
     roi_mask_path = Path(roi_mask_path)
-    allowed_mask_path = Path(allowed_mask_path)
-    output_root = Path(output_root)
+    allowed_mask_path = Path(allowed_mask_path) if allowed_mask_path is not None else None
+    forbidden_mask_path = Path(forbidden_mask_path) if forbidden_mask_path is not None else None
+    exclusion_mask_path = Path(exclusion_mask_path) if exclusion_mask_path is not None else None
 
     output_path = build_cleaned_mask_path(output_root, roi_mask_path, suffix)
     if output_path.exists() and not overwrite_existing:
@@ -102,6 +118,7 @@ def clean_roi_mask_file(
     output_path = clean_roi_mask(
         roi_mask_path=roi_mask_path,
         allowed_mask_path=allowed_mask_path,
+        forbidden_mask_path=forbidden_mask_path,
         output_path=output_path,
         exclusion_mask_path=exclusion_mask_path,
         exclusion_dilation=exclusion_dilation,
@@ -142,21 +159,29 @@ def find_matching_masks(mask_root, case_id, pattern="*.nii*", timepoint=None):
 
 def clean_roi_masks_folder(
         roi_root,
-        allowed_root,
         output_root,
+        allowed_root=None,
+        forbidden_root=None,
         exclusion_root=None,
         exclusion_dilation=1,
         suffix="_cleaned",
         roi_timepoint=None,
         allowed_timepoint=None,
+        forbidden_timepoint=None,
         exclusion_timepoint=None,
         overwrite_existing=False,
     ):
 
     roi_root = Path(roi_root)
-    allowed_root = Path(allowed_root)
     output_root = Path(output_root)
+    allowed_root = Path(allowed_root) if allowed_root is not None else None
+    forbidden_root = Path(forbidden_root) if forbidden_root is not None else None
     exclusion_root = Path(exclusion_root) if exclusion_root is not None else None
+
+    if allowed_root is None and forbidden_root is None and exclusion_root is None:
+        raise ValueError(
+            "At least one of allowed_root, forbidden_root, or exclusion_root is required for ROI cleaning."
+        )
 
     patients = get_patient_dirs(roi_root)
     created_files = []
@@ -165,15 +190,26 @@ def clean_roi_masks_folder(
 
         case_id = patient.name
         roi_image_paths = find_matching_masks(roi_root, case_id, timepoint=roi_timepoint)
-        allowed_mask_path = find_matching_mask(allowed_root, case_id, timepoint=allowed_timepoint)
 
         if not roi_image_paths:
             print(f"[Warning] No ROI mask found for {case_id}. Skipping.")
             continue
 
-        if allowed_mask_path is None:
-            print(f"[Warning] No allowed mask found for {case_id}. Skipping.")
-            continue
+        if allowed_root is not None:
+            allowed_mask_path = find_matching_mask(allowed_root, case_id, timepoint=allowed_timepoint)
+            if allowed_mask_path is None:
+                print(f"[Warning] No allowed mask found for {case_id}. Skipping.")
+                continue
+        else:
+            allowed_mask_path = None
+
+        if forbidden_root is not None:
+            forbidden_mask_path = find_matching_mask(forbidden_root, case_id, timepoint=forbidden_timepoint)
+            if forbidden_mask_path is None:
+                print(f"[Warning] No forbidden mask found for {case_id}. Skipping.")
+                continue
+        else:
+            forbidden_mask_path = None
 
         if exclusion_root is not None:
             exclusion_mask_path = find_matching_mask(exclusion_root, case_id, timepoint=exclusion_timepoint)
@@ -188,6 +224,7 @@ def clean_roi_masks_folder(
             output_path = clean_roi_mask_file(
                 roi_mask_path=roi_image_path,
                 allowed_mask_path=allowed_mask_path,
+                forbidden_mask_path=forbidden_mask_path,
                 output_root=case_output_root,
                 exclusion_mask_path=exclusion_mask_path,
                 exclusion_dilation=exclusion_dilation,
